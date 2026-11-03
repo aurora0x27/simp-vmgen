@@ -18,6 +18,7 @@ SCHEMA_VERSION = 1
 CONFIG_FILENAME = "vmgen.toml"
 LOCK_FILENAME = "vmgen.lock"
 DEFAULT_SSH_KEY = ".simp-vmgen/ssh/id_ed25519"
+DEFAULT_ROOT_PASSWORD = "114514"
 
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _USER_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
@@ -357,9 +358,7 @@ class Config:
             host=_string(ssh_table, "host", f"{source}.ssh", default="127.0.0.1"),
             port=_port(ssh_table.get("port", "auto"), f"{source}.ssh.port"),
             user=_string(ssh_table, "user", f"{source}.ssh", default="root"),
-            key=_string(
-                ssh_table, "key", f"{source}.ssh", default=DEFAULT_SSH_KEY
-            ),
+            key=_string(ssh_table, "key", f"{source}.ssh", default=DEFAULT_SSH_KEY),
             permit_root_login=_bool(ssh_table, "permit_root_login", f"{source}.ssh", default=True),
             wait_timeout=_int(ssh_table, "wait_timeout", f"{source}.ssh", default=900, minimum=1),
         )
@@ -507,9 +506,7 @@ class Config:
             if not mount.source.strip():
                 raise ConfigError(f"{where}.source: must not be empty")
             if "," in mount.source:
-                raise ConfigError(
-                    f"{where}.source: commas are not supported in 9p source paths"
-                )
+                raise ConfigError(f"{where}.source: commas are not supported in 9p source paths")
             mount.target = _absolute_target(mount.target, where)
             if mount.target in seen_targets:
                 raise ConfigError(f"{where}.target: duplicate target {mount.target!r}")

@@ -88,6 +88,9 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
         description="Create a new lab project from the selected distro template.",
     )
     p.add_argument("directory", nargs="?", default=".", metavar="DIR")
+    p.add_argument(
+        "--name", dest="project_name", metavar="NAME", help="project/hostname name"
+    )
     p.add_argument("-i", "--interactive", action="store_true", help="interactive wizard")
     p.add_argument("--distro", metavar="NAME", help="distro name (ubuntu, alpine)")
     p.add_argument("--release", metavar="VERSION", help="distro release")

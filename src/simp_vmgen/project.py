@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
 from .config import (
     CONFIG_FILENAME,
+    DEFAULT_ROOT_PASSWORD,
     DEFAULT_SSH_KEY,
     LOCK_FILENAME,
     Config,
@@ -26,8 +28,8 @@ from .errors import ProjectError
 from .lock import create_lock
 from .paths import load_project
 from .render import changed_files, render_project, write_rendered
+from .wizard import run_wizard
 
-DEFAULT_ROOT_PASSWORD = "114514"
 DEFAULT_KERNEL_VERSION = "6.12.5"
 
 
@@ -127,8 +129,9 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
     if args.kernel and not kernel_version:
         kernel_version = DEFAULT_KERNEL_VERSION
 
+    project_name = getattr(args, "project_name", None) or _project_name(target)
     config = Config(
-        project=ProjectConfig(_project_name(target)),
+        project=ProjectConfig(project_name),
         distro=DistroConfig(
             name=distro.name,
             release=release.version,
@@ -166,14 +169,18 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
 
 
 def new_project(args: argparse.Namespace) -> int:
-    if args.interactive:
-        raise ProjectError("interactive mode is not implemented yet")
-
     target = Path(args.directory).expanduser()
     if target.exists() and not target.is_dir():
         raise ProjectError(f"target exists and is not a directory: {target}")
     if target.exists() and any(target.iterdir()) and not args.force:
-        raise ProjectError(f"target directory is not empty: {target} (use --force to overwrite)")
+        raise ProjectError(
+            f"target directory is not empty: {target} (use --force to overwrite)"
+        )
+
+    if args.interactive:
+        if not sys.stdin.isatty():
+            raise ProjectError("interactive mode requires a TTY")
+        args = run_wizard(args, target)
 
     config = config_from_args(args, target)
     files = render_project(config)

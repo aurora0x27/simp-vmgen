@@ -41,7 +41,7 @@ stops and a commit message is provided.
 
 ## M5 - Polish
 
-- [ ] M5.1 Golden tests for Ubuntu/Alpine render output
+- [x] M5.1 Golden tests for Ubuntu/Alpine render output
 - [ ] M5.2 QEMU argv snapshot tests
 - [ ] M5.3 Slow integration boot tests
 - [ ] M5.4 Documentation and `uv tool install` smoke test

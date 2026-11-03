@@ -22,17 +22,15 @@ you pass `--force`.
 - Accelerator: `{{ config.vm.accel }}`
 - SSH: `{{ config.ssh.host }}:{{ config.ssh.port if config.ssh.port != "auto" else "<auto>" }}`{% if config.ssh.port == "auto" %} (port allocated at build time){% endif %}
 
-
 {% if config.kernel.enabled %}
 - Kernel: `{{ config.kernel.mode }}` mode, `{{ config.kernel.version or config.kernel.commit or config.kernel.artifact }}`
 - Kernel rootfs: `{{ config.kernel.rootfs }}`{% if config.kernel.initrd %}, initrd `{{ config.kernel.initrd }}`{% endif %}
 {% endif %}
 
-
 ## Users
 
 {% for user in config.users %}
-- `{{ user.name }}`{% if user.sudo %} (sudo){% endif %}{% if user.shell %}, shell `{{ user.shell }}`{% endif %}
+- `{{ user.name }}`{{ " (sudo)" if user.sudo else "" }}{{ ", shell `" ~ user.shell ~ "`" if user.shell else "" }}
 {% endfor %}
 
 The default login account is selected by `ssh.user`. Root SSH login can be

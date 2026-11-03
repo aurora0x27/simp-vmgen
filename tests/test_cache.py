@@ -44,6 +44,12 @@ def test_parse_checksum_file() -> None:
         cache.parse_checksum_file(text, "missing")
 
 
+def test_parse_single_hash_checksum_file() -> None:
+    assert cache.parse_checksum_file(f"{'c' * 128}\n", "image.qcow2") == (
+        f"sha512:{'c' * 128}"
+    )
+
+
 def test_verify_checksum(tmp_path: Path) -> None:
     path = tmp_path / "file"
     path.write_bytes(PAYLOAD)

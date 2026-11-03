@@ -106,7 +106,7 @@ def test_render_alpine_openrc_user_data(tmp_path: Path) -> None:
     )
 
     runcmd = "\n".join(data["runcmd"])
-    assert "apk add --no-cache" in runcmd
+    assert "apk add " in runcmd
     assert "build-base" not in runcmd
     assert "rc-update add sshd default" in runcmd
     assert "ttyS0::respawn" in runcmd

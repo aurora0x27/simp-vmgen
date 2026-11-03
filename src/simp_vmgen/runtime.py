@@ -437,46 +437,16 @@ def _ready_marker_seen(layout: ProjectLayout) -> bool:
         return False
 
 
-def _ssh_probe(config: Config, layout: ProjectLayout, state: RunState) -> bool:
-    has_key = layout.ssh_key.is_file() and layout.ssh_key.suffix != ".pub"
-    env = os.environ.copy()
-    argv = _ssh_argv(
-        config,
-        layout,
-        state,
-        ["true"],
-        tty=False,
-        batch=has_key,
-        connect_timeout=2,
-    )
-    if not has_key:
-        askpass = _askpass_env(config, layout)
-        if askpass is None:
-            return False
-        env = askpass
-        argv = _with_setsid(argv)
-    try:
-        result = subprocess.run(
-            argv, env=env, capture_output=True, text=True, check=False, timeout=8
-        )
-    except (OSError, subprocess.SubprocessError):
-        return False
-    return result.returncode == 0
-
-
 def wait(args: Any) -> int:
     _root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(_root, config)
-    state = _require_state(layout)
+    _require_state(layout)
     timeout = getattr(args, "timeout", None) or config.ssh.wait_timeout
     deadline = time.monotonic() + timeout
 
     print(f"waiting for the guest (timeout {timeout}s) ...")
     while time.monotonic() < deadline:
         if _ready_marker_seen(layout):
-            print("guest is ready")
-            return 0
-        if config.ssh.enabled and _ssh_probe(config, layout, state):
             print("guest is ready")
             return 0
         time.sleep(1)

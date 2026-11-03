@@ -85,7 +85,7 @@ write_files:
 
 runcmd:
   - sh -c 'apk update'
-  - sh -c 'apk add --no-cache {{ packages | map("shquote") | join(" ") }}'
+  - sh -c 'for i in 1 2 3; do apk add {{ packages | map("shquote") | join(" ") }} && exit 0; sleep 2; done; exit 1'
   - /usr/local/sbin/simp-vmgen-ssh
   - rc-update add sshd default || true
   - rc-service sshd restart || true

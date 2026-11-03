@@ -79,6 +79,12 @@ def parse_checksum_file(text: str, filename: str) -> str:
         if not line or line.startswith("#"):
             continue
         parts = line.split(None, 1)
+        if len(parts) == 1:
+            digest = parts[0]
+            algorithm = {64: "sha256", 128: "sha512"}.get(len(digest))
+            if algorithm is not None:
+                return f"{algorithm}:{digest.lower()}"
+            continue
         if len(parts) != 2:
             continue
         digest, name = parts

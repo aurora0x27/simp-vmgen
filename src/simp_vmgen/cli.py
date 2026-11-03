@@ -11,8 +11,12 @@ from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .project import new_project, regen_project
 from .runtime import build as runtime_build
+from .runtime import clean as runtime_clean
+from .runtime import console as runtime_console
 from .runtime import guest as runtime_guest
+from .runtime import log as runtime_log
 from .runtime import run as runtime_run
+from .runtime import serial as runtime_serial
 from .runtime import ssh as runtime_ssh
 from .runtime import status as runtime_status
 from .runtime import stop as runtime_stop
@@ -290,11 +294,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "wait": runtime_wait,
         "ssh": runtime_ssh,
         "tty": runtime_tty,
-        "serial": _not_implemented,
-        "console": _not_implemented,
-        "log": _not_implemented,
+        "serial": runtime_serial,
+        "console": runtime_console,
+        "log": runtime_log,
         "guest": runtime_guest,
-        "clean": _not_implemented,
+        "clean": runtime_clean,
         "kernel": _not_implemented,
         "gdb": _not_implemented,
     }

@@ -8,10 +8,12 @@ import shlex
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
+from .attach import attach_socket, show_log
 from .cache import download, images_dir
 from .config import LOCK_FILENAME, Config
 from .distros import Distro, DistroRelease, load_distro
@@ -482,3 +484,44 @@ def wait(args: Any) -> int:
         f"timed out after {timeout}s waiting for the guest; "
         f"see `simp-vmgen log` ({layout.serial_log})"
     )
+
+
+def serial(args: Any) -> int:
+    _root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(_root, config)
+    _require_state(layout)
+    print(
+        "attaching to the serial console; Ctrl-] detaches",
+        file=sys.stderr,
+    )
+    return attach_socket(layout.serial_sock)
+
+
+def console(args: Any) -> int:
+    _root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(_root, config)
+    _require_state(layout)
+    print(
+        "attaching to the QEMU monitor; try `info status`, Ctrl-] detaches",
+        file=sys.stderr,
+    )
+    return attach_socket(layout.monitor_sock)
+
+
+def log(args: Any) -> int:
+    _root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(_root, config)
+    return show_log(layout.serial_log, follow=getattr(args, "follow", False))
+
+
+def clean(args: Any) -> int:
+    root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(root, config)
+    stop(args)
+    if getattr(args, "all", False):
+        shutil.rmtree(layout.runtime_dir, ignore_errors=True)
+        print(f"removed {layout.runtime_dir}")
+    else:
+        shutil.rmtree(layout.run_dir, ignore_errors=True)
+        print(f"removed {layout.run_dir}")
+    return 0

@@ -49,6 +49,8 @@ def test_configure_kernel(tmp_path: Path) -> None:
 
     text = config_file.read_text()
     assert "CONFIG_BASE=n" in text
+    assert "CONFIG_9P_FS=y" in text
+    assert "CONFIG_VIRTIO_PCI=y" in text
     assert "CONFIG_DEBUG_INFO=y" in text
     assert "CONFIG_KASAN=y" in text
     assert "CONFIG_FRAGMENT=y" in text

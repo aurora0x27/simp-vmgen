@@ -32,6 +32,26 @@ def _load_lock(root: Path, config: Config) -> Lock:
     return create_lock(config, distro, distro.release(config.distro.release))
 
 
+DEFAULT_VM_KCONFIG = {
+    "CONFIG_9P_FS": "y",
+    "CONFIG_NET_9P": "y",
+    "CONFIG_NET_9P_VIRTIO": "y",
+    "CONFIG_VIRTIO": "y",
+    "CONFIG_VIRTIO_PCI": "y",
+    "CONFIG_VIRTIO_BLK": "y",
+    "CONFIG_VIRTIO_NET": "y",
+    "CONFIG_DEVTMPFS": "y",
+    "CONFIG_DEVTMPFS_MOUNT": "y",
+    "CONFIG_SERIAL_8250": "y",
+    "CONFIG_SERIAL_8250_CONSOLE": "y",
+    "CONFIG_BLK_DEV_INITRD": "y",
+    "CONFIG_RD_GZIP": "y",
+    "CONFIG_TMPFS": "y",
+    "CONFIG_PROC_FS": "y",
+    "CONFIG_SYSFS": "y",
+}
+
+
 def kernel_build_dir(layout: ProjectLayout) -> Path:
     return layout.kernel_dir / "build"
 
@@ -117,6 +137,9 @@ def configure_kernel(
         _run_make(source, build, config, target)
 
     with config_file.open("a", encoding="utf-8") as handle:
+        handle.write("\n# simp-vmgen VM defaults\n")
+        for name, value in sorted(DEFAULT_VM_KCONFIG.items()):
+            handle.write(f"{name}={value}\n")
         handle.write("\n# simp-vmgen fragments\n")
         for fragment in config.kernel.fragments:
             path = Path(fragment).expanduser()

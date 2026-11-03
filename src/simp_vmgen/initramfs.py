@@ -136,8 +136,12 @@ def build_initramfs(
         return output
 
     shutil.rmtree(rootfs, ignore_errors=True)
-    for directory in ("bin", "dev", "etc", "proc", "run", "sys", "tmp", "root"):
+    for directory in ("bin", "dev", "etc", "lib", "proc", "run", "sys", "tmp", "root"):
         (rootfs / directory).mkdir(parents=True, exist_ok=True)
+
+    modules = layout.kernel_dir / "modules" / "lib"
+    if modules.is_dir():
+        shutil.copytree(modules, rootfs / "lib", dirs_exist_ok=True)
 
     busybox = busybox_path or ensure_busybox()
     shutil.copy2(busybox, rootfs / "bin" / "busybox")

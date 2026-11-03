@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from simp_vmgen.config import Config, KernelConfig
+from simp_vmgen.config import Config, KernelConfig, MountConfig
 from simp_vmgen.initramfs import build_initramfs
 from simp_vmgen.layout import ProjectLayout
 
@@ -15,10 +15,15 @@ from simp_vmgen.layout import ProjectLayout
 @pytest.mark.skipif(shutil.which("cpio") is None, reason="cpio missing")
 def test_build_initramfs(tmp_path: Path) -> None:
     (tmp_path / "work").mkdir()
+    (tmp_path / "src").mkdir()
     config = Config.default("lab")
     config.kernel = KernelConfig(enabled=True, version="6.1.0")
+    config.mounts.append(MountConfig("src", "/src", readonly=True))
     config.validate()
     layout = ProjectLayout(tmp_path, config)
+    modules = layout.kernel_dir / "modules" / "lib" / "modules" / "6.1.0"
+    modules.mkdir(parents=True)
+    (modules / "modules.dep").write_text("")
 
     output = build_initramfs(
         config,
@@ -33,6 +38,8 @@ def test_build_initramfs(tmp_path: Path) -> None:
     assert "SIMP_VMGEN_READY" in init
     assert "host0" in init
     assert "/work" in init
+    assert "version=9p2000.L,ro host1 /src" in init
+    assert (layout.kernel_dir / "initramfs" / "lib" / "modules" / "6.1.0" / "modules.dep").is_file()
 
     archive = gzip.decompress(output.read_bytes())
     result = subprocess.run(

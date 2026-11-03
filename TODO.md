@@ -36,7 +36,7 @@ stops and a commit message is provided.
 - [x] M4.3 Kernel build (`bzImage`, `vmlinux`, modules)
 - [x] M4.4 Busybox rootfs plugin and initramfs generation
 - [x] M4.5 Kernel boot arguments, GDB stub and `sim-vmgen kernel` commands
-- [ ] M4.6 Volume mounts inside the busybox init script
+- [x] M4.6 Volume mounts inside the busybox init script
 
 ## M5 - Polish
 

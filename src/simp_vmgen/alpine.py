@@ -147,8 +147,12 @@ def _load_colon_file(path: Path) -> dict[str, list[str]]:
     return result
 
 
-def _write_colon_file(path: Path, entries: dict[str, list[str]]) -> None:
-    _write(path, "\n".join(":".join(fields) for fields in entries.values()) + "\n")
+def _write_colon_file(path: Path, entries: dict[str, list[str]], *, mode: int = 0o644) -> None:
+    _write(
+        path,
+        "\n".join(":".join(fields) for fields in entries.values()) + "\n",
+        mode=mode,
+    )
 
 
 def _allocate(used: set[int]) -> int:
@@ -242,7 +246,7 @@ def _prepare_users(
 
     _write_colon_file(rootfs / "etc" / "passwd", passwd)
     _write_colon_file(rootfs / "etc" / "group", group)
-    _write_colon_file(rootfs / "etc" / "shadow", shadow)
+    _write_colon_file(rootfs / "etc" / "shadow", shadow, mode=0o640)
     if sudoers:
         _write(
             rootfs / "etc" / "sudoers.d" / "90-simp-vmgen",
@@ -306,7 +310,7 @@ def _enable_service(rootfs: Path, runlevel: str, service: str) -> None:
         return
     link = rootfs / "etc" / "runlevels" / runlevel / service
     link.parent.mkdir(parents=True, exist_ok=True)
-    if not link.exists():
+    if not link.exists() and not link.is_symlink():
         link.symlink_to(f"/etc/init.d/{service}")
 
 

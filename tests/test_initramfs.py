@@ -64,6 +64,39 @@ def test_initramfs_applet_symlinks_are_relative(tmp_path: Path) -> None:
     assert sh.readlink() == Path("busybox")
 
 
+def test_build_alpine_initramfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from simp_vmgen import initramfs
+    from simp_vmgen.rootfs import load_rootfs
+    from simp_vmgen.rootfs_source import RootfsSourceInfo
+
+    rootfs = tmp_path / "alpine-rootfs"
+    (rootfs / "etc").mkdir(parents=True)
+    (rootfs / "init").write_text("#!/bin/sh\nexec /sbin/init\n")
+    (rootfs / "etc" / "passwd").write_text("root:x:0:0::/root:/bin/sh\n")
+    config = Config.default("lab")
+    config.distro.name = "alpine"
+    config.distro.release = "3.22"
+    config.kernel = KernelConfig(enabled=True, version="6.1.0", rootfs="alpine")
+    config.validate()
+    layout = ProjectLayout(tmp_path, config)
+    info = RootfsSourceInfo(
+        spec=load_rootfs("alpine"),
+        archive=tmp_path / "mini.tar.gz",
+        root_dir=rootfs,
+        checksum="sha256:" + "a" * 64,
+    )
+    monkeypatch.setattr(initramfs, "ensure_ssh_key", lambda *args: None)
+    monkeypatch.setattr(initramfs, "prepare_alpine_rootfs", lambda *args, **kwargs: info)
+
+    output = initramfs.build_initramfs(config, layout)
+    archive = gzip.decompress(output.read_bytes())
+    listing = subprocess.run(
+        ["cpio", "-it"], input=archive, capture_output=True, check=False
+    ).stdout.decode()
+    assert "init" in listing
+    assert "etc/passwd" in listing
+
+
 def test_initramfs_dry_run(tmp_path: Path) -> None:
     config = Config.default("lab")
     config.kernel = KernelConfig(enabled=True, version="6.1.0")

@@ -14,6 +14,7 @@ from typing import Any
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
 from . import __version__
+from .alpine import prepare_alpine_rootfs
 from .cache import cache_dir, download
 from .config import Config
 from .errors import ProjectError
@@ -21,7 +22,9 @@ from .layout import ProjectLayout
 from .mounts import resolve_mounts
 from .paths import load_project
 from .rootfs import RootfsSpec, load_rootfs
+from .rootfs_source import update_lock as update_rootfs_lock
 from .seed import READY_MARKER
+from .sshkeys import ensure_ssh_key
 
 
 @lru_cache(maxsize=1)
@@ -85,10 +88,11 @@ def _install_applets(busybox: Path, rootfs: Path) -> None:
         target.symlink_to("busybox")
 
 
-def _archive(rootfs: Path, output: Path) -> None:
+def _archive(rootfs: Path, output: Path, *, owner: str = "0:0") -> None:
     cpio = shutil.which("cpio")
     if cpio is None:
         raise ProjectError("cpio not found")
+    output.parent.mkdir(parents=True, exist_ok=True)
     paths = ["."]
     for directory, dirnames, filenames in os.walk(rootfs):
         dirnames.sort()
@@ -101,7 +105,7 @@ def _archive(rootfs: Path, output: Path) -> None:
     data = ("\n".join(paths) + "\n").encode()
     try:
         result = subprocess.run(
-            [cpio, "-o", "-H", "newc", "--quiet"],
+            [cpio, "-o", "-H", "newc", "--quiet", "-R", owner],
             cwd=rootfs,
             input=data,
             capture_output=True,
@@ -119,27 +123,16 @@ def _archive(rootfs: Path, output: Path) -> None:
     os.replace(tmp, output)
 
 
-def build_initramfs(
+def _build_busybox(
     config: Config,
     layout: ProjectLayout,
+    spec: RootfsSpec,
+    output: Path,
     *,
-    busybox_path: Path | None = None,
-    install_applets: bool = True,
-    dry_run: bool = False,
+    busybox_path: Path | None,
+    install_applets: bool,
 ) -> Path:
-    if config.kernel.rootfs == "none":
-        raise ProjectError("kernel.rootfs is 'none'; provide kernel.initrd instead")
-    spec = load_rootfs(config.kernel.rootfs)
-    if spec.name != "busybox":
-        raise ProjectError(
-            f"rootfs plugin {spec.name!r} is not implemented yet (only busybox is available)"
-        )
     rootfs = layout.kernel_dir / "initramfs"
-    output = layout.kernel_dir / "initramfs.cpio.gz"
-    if dry_run:
-        print(f"would build initramfs: {output}")
-        return output
-
     shutil.rmtree(rootfs, ignore_errors=True)
     for directory in ("bin", "dev", "etc", "lib", "proc", "run", "sys", "tmp", "root"):
         (rootfs / directory).mkdir(parents=True, exist_ok=True)
@@ -175,6 +168,47 @@ def build_initramfs(
     return output
 
 
+def build_initramfs(
+    config: Config,
+    layout: ProjectLayout,
+    *,
+    busybox_path: Path | None = None,
+    install_applets: bool = True,
+    force: bool = False,
+    dry_run: bool = False,
+) -> Path:
+    if config.kernel.rootfs == "none":
+        raise ProjectError("kernel.rootfs is 'none'; provide kernel.initrd instead")
+    spec = load_rootfs(config.kernel.rootfs)
+    output = layout.kernel_dir / "initramfs.cpio.gz"
+    if dry_run:
+        print(f"would build initramfs: {output}")
+        return output
+
+    if spec.name == "busybox":
+        return _build_busybox(
+            config,
+            layout,
+            spec,
+            output,
+            busybox_path=busybox_path,
+            install_applets=install_applets,
+        )
+    if spec.name == "alpine":
+        key = ensure_ssh_key(config, layout.ssh_key)
+        info = prepare_alpine_rootfs(
+            config,
+            layout.root,
+            layout,
+            generated_public_key=key.public_key if key is not None else "",
+            force=force,
+        )
+        update_rootfs_lock(layout.root, info)
+        _archive(info.root_dir, output)
+        return output
+    raise ProjectError(f"rootfs plugin {spec.name!r} cannot build an initramfs")
+
+
 def kernel_initramfs(args: Any) -> int:
     root, config = load_project(getattr(args, "directory", None))
     if not config.kernel.enabled:
@@ -183,6 +217,7 @@ def kernel_initramfs(args: Any) -> int:
     output = build_initramfs(
         config,
         layout,
+        force=getattr(args, "force", False),
         dry_run=getattr(args, "dry_run", False),
     )
     if getattr(args, "dry_run", False):

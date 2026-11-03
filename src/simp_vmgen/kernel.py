@@ -301,8 +301,9 @@ def kernel_clean(args: Any) -> int:
     _root, _config, layout = _project(args)
     shutil.rmtree(layout.kernel_dir / "build", ignore_errors=True)
     shutil.rmtree(layout.kernel_dir / "initramfs", ignore_errors=True)
+    shutil.rmtree(layout.kernel_dir / "rootfs", ignore_errors=True)
     (layout.kernel_dir / "initramfs.cpio.gz").unlink(missing_ok=True)
-    print(f"removed {layout.kernel_dir / 'build'} and initramfs")
+    print(f"removed {layout.kernel_dir / 'build'}, rootfs and initramfs")
     return 0
 
 

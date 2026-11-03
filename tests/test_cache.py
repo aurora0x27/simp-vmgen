@@ -86,6 +86,13 @@ def test_download_uses_checksum_url(
     assert path.read_bytes() == PAYLOAD
     assert checksum == f"sha256:{SHA256}"
 
+    again, _ = cache.download(
+        f"{http_server}/image.qcow2",
+        "image.qcow2",
+        checksum_url=f"{http_server}/SHA256SUMS",
+    )
+    assert again == path
+
 
 def test_download_rejects_bad_checksum(
     tmp_path: Path, http_server: str, monkeypatch: pytest.MonkeyPatch

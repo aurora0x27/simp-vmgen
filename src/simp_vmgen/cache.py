@@ -170,6 +170,9 @@ def download(
             raise CacheError(
                 f"no checksum available for {filename}; refusing an unverified download"
             )
+        if target.exists() and resolved and verify_checksum(target, resolved):
+            target.with_name(f"{target.name}.part").unlink(missing_ok=True)
+            return target, resolved
 
         part = target.with_name(f"{target.name}.part")
         _download_to(url, part)

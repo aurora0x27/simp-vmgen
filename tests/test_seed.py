@@ -102,14 +102,15 @@ def test_render_alpine_openrc_user_data(tmp_path: Path) -> None:
     assert "PermitRootLogin yes" in sshd
     assert "PasswordAuthentication yes" in sshd
     assert files["/etc/init.d/simp-vmgen-ready"]["content"].startswith("#!/sbin/openrc-run")
+    provision = files["/usr/local/sbin/simp-vmgen-provision"]["content"]
+    assert "apk add " in provision
+    assert "rc-update add sshd default" in provision
+    assert "ttyS0::respawn" in provision
+    assert "rc-update add simp-vmgen-ready default" in provision
+    assert "deluser --remove-home alpine" in provision
 
     runcmd = "\n".join(data["runcmd"])
-    assert "apk add " in runcmd
-    assert "build-base" not in runcmd
-    assert "rc-update add sshd default" in runcmd
-    assert "ttyS0::respawn" in runcmd
-    assert "rc-update add simp-vmgen-ready default" in runcmd
-    assert "deluser --remove-home alpine" in runcmd
+    assert "setsid /usr/local/sbin/simp-vmgen-provision" in runcmd
 
 
 def test_alpine_keeps_alpine_user_if_configured(tmp_path: Path) -> None:

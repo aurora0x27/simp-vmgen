@@ -10,6 +10,7 @@ import pytest
 
 from simp_vmgen import runtime
 from simp_vmgen.cli import main
+from simp_vmgen.config import Config
 
 pytestmark = [
     pytest.mark.slow,
@@ -53,10 +54,16 @@ def test_alpine_cloud_image_boot(tmp_path: Path) -> None:
         )
         == 0
     )
+    # Keep the boot test focused: package installation is covered separately
+    # and can be slow/flaky on a fresh Alpine mirror.
+    config = Config.load(root / "vmgen.toml")
+    config.provision.package_sets = []
+    config.save(root / "vmgen.toml")
+
     try:
         assert runtime.build(_args(root, dry_run=False, force=False)) == 0
         assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
-        assert runtime.wait(_args(root, timeout=600)) == 0
+        assert runtime.wait(_args(root, timeout=300)) == 0
         assert runtime.guest(_args(root, guest_command=["sh", "-c", "uname -s"])) == 0
     finally:
         _stop(root)

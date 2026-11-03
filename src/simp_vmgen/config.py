@@ -424,8 +424,11 @@ class Config:
             timezone=_string(
                 provision_table, "timezone", f"{source}.provision", default="Asia/Shanghai"
             ),
-            package_sets=_string_list(provision_table, "package_sets", f"{source}.provision")
-            or ["base"],
+            package_sets=(
+                _string_list(provision_table, "package_sets", f"{source}.provision")
+                if "package_sets" in provision_table
+                else ["base"]
+            ),
             extra_packages=_string_list(provision_table, "extra_packages", f"{source}.provision"),
             extra_user_data=_string(provision_table, "extra_user_data", f"{source}.provision"),
         )
@@ -771,9 +774,10 @@ class Config:
                 item["ssh_keys"] = list(user.ssh_keys)
             users.append(item)
 
-        provision: dict[str, Any] = {"timezone": self.provision.timezone}
-        if self.provision.package_sets:
-            provision["package_sets"] = list(self.provision.package_sets)
+        provision: dict[str, Any] = {
+            "timezone": self.provision.timezone,
+            "package_sets": list(self.provision.package_sets),
+        }
         if self.provision.extra_packages:
             provision["extra_packages"] = list(self.provision.extra_packages)
         if self.provision.extra_user_data:

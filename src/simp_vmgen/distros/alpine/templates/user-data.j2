@@ -70,6 +70,30 @@ write_files:
       else
           echo 'PasswordAuthentication {{ "yes" if ssh_pwauth else "no" }}' >> "$conf"
       fi
+  - path: /usr/local/sbin/simp-vmgen-provision
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      set -u
+{% if packages %}
+      apk update || true
+      for attempt in 1 2 3; do
+          apk add {{ packages | map("shquote") | join(" ") }} && break
+          sleep 2
+      done
+{% endif %}
+      /usr/local/sbin/simp-vmgen-ssh || true
+      rc-update add sshd default || true
+      rc-service sshd restart || true
+      grep -q '^ttyS0' /etc/inittab 2>/dev/null || echo 'ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100' >> /etc/inittab
+      kill -HUP 1 || true
+      /usr/local/sbin/simp-vmgen-mounts || true
+      rc-update add simp-vmgen-ready default || true
+      rc-service simp-vmgen-ready restart || true
+      /usr/local/bin/simp-vmgen-ready || true
+{% if users | selectattr("name", "equalto", "alpine") | list | length == 0 %}
+      id alpine >/dev/null 2>&1 && deluser --remove-home alpine || true
+{% endif %}
   - path: /usr/local/bin/simp-vmgen-ready
     permissions: "0755"
     content: |
@@ -84,18 +108,8 @@ write_files:
       command_background="no"
 
 runcmd:
-  - sh -c 'apk update'
-  - sh -c 'for i in 1 2 3; do apk add {{ packages | map("shquote") | join(" ") }} && exit 0; sleep 2; done; exit 1'
-  - /usr/local/sbin/simp-vmgen-ssh
-  - rc-update add sshd default || true
-  - rc-service sshd restart || true
-  - sh -c 'grep -q "^ttyS0" /etc/inittab 2>/dev/null || echo "ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100" >> /etc/inittab; kill -HUP 1 || true'
-  - /usr/local/sbin/simp-vmgen-mounts || true
-  - rc-update add simp-vmgen-ready default || true
-  - rc-service simp-vmgen-ready restart || true
-  - /usr/local/bin/simp-vmgen-ready || true
-{% if users | selectattr("name", "equalto", "alpine") | list | length == 0 %}
-  - sh -c 'id alpine >/dev/null 2>&1 && deluser --remove-home alpine || true'
-{% endif %}
+  # Keep cloud-final short: package installation can exceed the OpenRC
+  # cloud-final service timeout, so run provisioning in a detached session.
+  - sh -c 'setsid /usr/local/sbin/simp-vmgen-provision >/var/log/simp-vmgen-provision.log 2>&1 < /dev/null &'
 
-final_message: "simp-vmgen guest ready after $UPTIME s"
+final_message: "simp-vmgen provisioning started after $UPTIME s"

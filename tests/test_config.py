@@ -94,6 +94,13 @@ release = "24.04"
     assert Config.loads(config.dumps()).mounts == []
 
 
+def test_empty_package_sets_roundtrip() -> None:
+    config = Config.default("lab")
+    config.provision.package_sets = []
+    loaded = Config.loads(config.dumps())
+    assert loaded.provision.package_sets == []
+
+
 def test_save_and_load(tmp_path: Path) -> None:
     path = tmp_path / "vmgen.toml"
     config = Config.loads(MULTI_USER)

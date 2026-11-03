@@ -96,6 +96,29 @@ ssh_keys = ["ssh-ed25519 AAAA..."]
 non-root user for a non-root default login; root login can also be disabled
 with `permit_root_login = false` (then `ssh.user` must not be `root`).
 
+## Volumes
+
+Docker-style volumes may be added when creating a project or edited in
+`vmgen.toml`:
+
+```sh
+simp-vmgen new lab -v work:/work -v ~/src:/src:ro
+```
+
+```toml
+[[mount]]
+source = "work"
+target = "/work"
+
+[[mount]]
+source = "~/src"
+target = "/src"
+readonly = true
+```
+
+Relative sources are resolved from the project root. Each mount becomes a 9p
+share (`host0`, `host1`, ...) and is mounted in the guest by cloud-init.
+
 ## Diagnostics
 
 ```sh

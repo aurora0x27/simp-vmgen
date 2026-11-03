@@ -506,6 +506,10 @@ class Config:
             where = f"{source}.mount[{index}]"
             if not mount.source.strip():
                 raise ConfigError(f"{where}.source: must not be empty")
+            if "," in mount.source:
+                raise ConfigError(
+                    f"{where}.source: commas are not supported in 9p source paths"
+                )
             mount.target = _absolute_target(mount.target, where)
             if mount.target in seen_targets:
                 raise ConfigError(f"{where}.target: duplicate target {mount.target!r}")

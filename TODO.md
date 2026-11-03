@@ -21,7 +21,7 @@ stops and a commit message is provided.
 - [x] M2.6 User management: root login toggle, root password, multiple users,
       per-user password/SSH keys/shell/sudo
 - [x] M2.7 Alpine cloud-image support (OpenRC provisioning)
-- [ ] M2.8 Volume mounts (`-v SRC:DST[:ro]`) for cloud-init distros
+- [x] M2.8 Volume mounts (`-v SRC:DST[:ro]`) for cloud-init distros
 
 ## M3 - Interactive workflow
 

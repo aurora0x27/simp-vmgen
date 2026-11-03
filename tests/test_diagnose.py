@@ -85,6 +85,30 @@ def test_render_text_and_json_report() -> None:
     assert data["checks"][1]["status"] == "missing"
 
 
+def test_kernel_artifact_profile_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from simp_vmgen.config import Config, KernelConfig
+
+    artifact = tmp_path / "bzImage"
+    artifact.write_bytes(b"kernel")
+    config = Config.default("lab")
+    config.kernel = KernelConfig(
+        enabled=True, mode="artifact", artifact=str(artifact)
+    )
+    config.validate()
+    monkeypatch.setattr(
+        diag, "_load_optional_project", lambda directory: (tmp_path, config)
+    )
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+    report = diag.build_report(directory=str(tmp_path))
+    names = [check.name for check in report.checks]
+    assert report.profile == "kernel"
+    assert "kernel artifact" in names
+    assert "flex" not in names
+    assert "bc" not in names
+
+
 def test_diagnose_json_and_exit_code(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

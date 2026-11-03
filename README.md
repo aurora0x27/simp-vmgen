@@ -129,6 +129,31 @@ simp-vmgen -C lab show --json
 `show` prints the resolved configuration, lock information and runtime paths.
 `--json` is intended for scripts.
 
+## Kernel experiments
+
+Two simple modes are supported:
+
+```sh
+# Build a kernel from a version or git commit
+simp-vmgen new lab-kernel --kernel-version 6.12.5
+simp-vmgen -C lab-kernel kernel fetch
+simp-vmgen -C lab-kernel kernel config
+simp-vmgen -C lab-kernel kernel build
+simp-vmgen -C lab-kernel kernel initramfs
+simp-vmgen -C lab-kernel run
+
+# Or boot an existing artifact with a busybox initramfs
+simp-vmgen new lab-artifact --kernel-artifact /boot/vmlinuz-linux \
+    --kernel-artifact-type vmlinuz
+simp-vmgen -C lab-artifact build
+simp-vmgen -C lab-artifact run
+```
+
+`kernel.config` can be a defconfig target or a `.config` file. Extra Kconfig
+fragments, `CONFIG_*` options, make targets and arbitrary make arguments are
+configured in `[kernel]` in `vmgen.toml`. Set `kernel.initrd` to use your own
+initrd instead of the generated busybox one.
+
 ## Diagnostics
 
 ```sh

@@ -21,9 +21,13 @@ you pass `--force`.
 - Resources: {{ config.vm.mem }} RAM, {{ config.vm.cpus }} vCPU, {{ config.vm.disk }} disk
 - Accelerator: `{{ config.vm.accel }}`
 - SSH: `{{ config.ssh.host }}:{{ config.ssh.port if config.ssh.port != "auto" else "<auto>" }}`{% if config.ssh.port == "auto" %} (port allocated at build time){% endif %}
+
+
 {% if config.kernel.enabled %}
-- Kernel: `{{ config.kernel.version or config.kernel.commit or config.kernel.artifact }}` with `{{ config.kernel.rootfs }}` rootfs
+- Kernel: `{{ config.kernel.mode }}` mode, `{{ config.kernel.version or config.kernel.commit or config.kernel.artifact }}`
+- Kernel rootfs: `{{ config.kernel.rootfs }}`{% if config.kernel.initrd %}, initrd `{{ config.kernel.initrd }}`{% endif %}
 {% endif %}
+
 
 ## Users
 
@@ -64,9 +68,12 @@ make stop
 make clean
 ```
 
-`simp-vmgen show --json` is available for scripts. Kernel projects also provide
-`make kernel-fetch`, `make kernel-config`, `make kernel-build` and
-`make kernel-initramfs`.
+`simp-vmgen show --json` is available for scripts.
+
+Kernel projects also provide `make kernel-fetch`, `make kernel-config`,
+`make kernel-build`, `make kernel-initramfs` and `simp-vmgen kernel status`.
+Artifact-mode projects skip the source build and boot the configured
+`kernel.artifact` instead.
 
 ## Requirements
 

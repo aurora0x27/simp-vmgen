@@ -239,6 +239,18 @@ def _check_python() -> CheckResult:
     return CheckResult("python", "ok", detail=platform.python_version())
 
 
+def _check_file(name: str, path: Path, *, required: bool = True) -> CheckResult:
+    if path.is_file():
+        return CheckResult(name, "ok", detail=str(path), required=required)
+    return CheckResult(
+        name,
+        "missing" if required else "optional",
+        detail=str(path),
+        hint="check the path in vmgen.toml",
+        required=required,
+    )
+
+
 def _load_optional_project(directory: str | None) -> tuple[Path | None, Config | None]:
     if directory is not None:
         root, config = load_project(directory)
@@ -268,32 +280,52 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
     checks.append(_check_tool("tar"))
     checks.append(_check_tool("gzip"))
 
-    if selected in ("cloudimg", "kernel"):
+    if selected == "cloudimg":
         checks.append(_check_seed_tool())
         checks.append(_check_tool("ssh"))
         checks.append(_check_tool("ssh-keygen"))
 
     if selected == "kernel":
-        for tool in (
-            "make",
-            "gcc",
-            "flex",
-            "bison",
-            "bc",
-            "perl",
-            "cpio",
-            "xz",
-            "openssl",
-            "pahole",
-        ):
-            checks.append(_check_tool(tool))
-        checks.append(_check_tool("busybox", required=False))
+        kernel = config.kernel if config is not None else None
+        if kernel is not None and kernel.mode == "artifact":
+            root = _root or Path.cwd()
+            artifact = Path(kernel.artifact).expanduser()
+            if not artifact.is_absolute():
+                artifact = root / artifact
+            checks.append(_check_file("kernel artifact", artifact))
+            if kernel.initrd:
+                initrd = Path(kernel.initrd).expanduser()
+                if not initrd.is_absolute():
+                    initrd = root / initrd
+                checks.append(_check_file("kernel initrd", initrd))
+            else:
+                checks.append(_check_tool("cpio"))
+                checks.append(_check_tool("busybox", required=False))
+        else:
+            for tool in (
+                "make",
+                "gcc",
+                "flex",
+                "bison",
+                "bc",
+                "perl",
+                "cpio",
+                "xz",
+                "openssl",
+                "pahole",
+            ):
+                checks.append(_check_tool(tool))
+            if kernel is not None and kernel.commit:
+                checks.append(_check_tool("git"))
+            if kernel is None or not kernel.initrd:
+                checks.append(_check_tool("cpio"))
+                checks.append(_check_tool("busybox", required=False))
 
     cache, disk = _check_cache()
     checks.extend([cache, disk, _check_kvm()])
 
     if config is not None:
-        if config.ssh.enabled:
+        if config.ssh.enabled and not config.kernel.enabled:
             port = _check_port("ssh port", config.ssh.host, config.ssh.port)
             if port is not None:
                 checks.append(port)

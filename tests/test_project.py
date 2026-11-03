@@ -113,6 +113,7 @@ def test_new_kernel_build_options(tmp_path: Path) -> None:
         == EXIT_OK
     )
     config = Config.load(target / "vmgen.toml")
+    assert config.kernel.enabled is True
     assert config.kernel.mode == "build"
     assert config.kernel.version == "6.12.5"
     assert config.kernel.options == {"CONFIG_DEBUG_INFO": "y"}

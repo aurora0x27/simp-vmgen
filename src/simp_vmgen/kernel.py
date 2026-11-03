@@ -190,6 +190,12 @@ class KernelArtifacts:
     initrd: Path
 
 
+def _update_kernel_lock(root: Path, config: Config, info: Any) -> None:
+    lock = _load_lock(root, config)
+    apply_to_lock(lock, info)
+    lock.save(root / LOCK_FILENAME)
+
+
 def build_kernel(
     config: Config,
     root: Path,
@@ -200,6 +206,8 @@ def build_kernel(
     if config.kernel.mode == "artifact":
         raise ProjectError("kernel build is not available in artifact mode")
     info = resolve_source(config, root, layout, dry_run=dry_run)
+    if not dry_run:
+        _update_kernel_lock(root, config, info)
     build = kernel_build_dir(layout)
     if not dry_run and not (build / ".config").is_file():
         configure_kernel(config, root, info.path, layout)
@@ -249,7 +257,10 @@ def ensure_kernel_artifacts(
         raise ProjectError("kernel support is not enabled in vmgen.toml")
     image: Path | None
     if config.kernel.mode == "artifact":
-        image = artifact_path(config, root)
+        info = resolve_source(config, root, layout, dry_run=dry_run)
+        image = info.path
+        if not dry_run:
+            _update_kernel_lock(root, config, info)
     else:
         image = built_image_path(config, layout)
         if image is None or not image.is_file():
@@ -333,7 +344,11 @@ def kernel_status(args: Any) -> int:
         print(f"source  : tarball {config.kernel.version}")
         print(f"tree    : {layout.kernel_dir / 'src' / f'linux-{config.kernel.version}'}")
     print(f"build   : {kernel_build_dir(layout)}")
-    image = built_image_path(config, layout)
+    image: Path | None
+    if config.kernel.mode == "artifact":
+        image = Path(config.kernel.artifact).expanduser()
+    else:
+        image = built_image_path(config, layout)
     if image is not None:
         print(f"image   : {image} ({'present' if image.is_file() else 'missing'})")
     initrd = (

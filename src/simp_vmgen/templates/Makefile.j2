@@ -5,7 +5,7 @@ SIMP_VMGEN ?= simp-vmgen
 
 .PHONY: help build regen regen-check show diagnose run run-fg snapshot stop status wait log \
         tty ssh serial console guest lab kernel-fetch kernel-config \
-        kernel-build kernel-initramfs clean distclean
+        kernel-build kernel-initramfs kernel-status clean distclean
 
 help:
 	@$(SIMP_VMGEN) --help
@@ -76,6 +76,9 @@ kernel-build:
 
 kernel-initramfs:
 	@$(SIMP_VMGEN) kernel initramfs
+
+kernel-status:
+	@$(SIMP_VMGEN) kernel status
 
 clean:
 	@$(SIMP_VMGEN) clean

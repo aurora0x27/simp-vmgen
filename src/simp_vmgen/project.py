@@ -142,7 +142,12 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
         )
     release = distro.release(args.release)
 
-    kernel_enabled = bool(args.kernel or args.kernel_artifact or args.kernel_commit)
+    kernel_enabled = bool(
+        args.kernel
+        or args.kernel_version
+        or args.kernel_commit
+        or args.kernel_artifact
+    )
     kernel_mode = "artifact" if args.kernel_artifact else "build"
     kernel_version = args.kernel_version or ""
     if kernel_enabled and kernel_mode == "build" and not kernel_version and not args.kernel_commit:

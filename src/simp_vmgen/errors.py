@@ -1,0 +1,11 @@
+"""Shared exceptions for simp-vmgen."""
+
+from __future__ import annotations
+
+
+class SimpVmgenError(Exception):
+    """Base class for expected, user-facing failures."""
+
+
+class ConfigError(SimpVmgenError):
+    """Invalid or unreadable project configuration."""

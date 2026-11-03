@@ -60,8 +60,6 @@ def test_placeholder_handler(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_new_volume_options() -> None:
     parser = build_parser()
-    args = parser.parse_args(
-        ["new", "lab", "-v", "work:/work", "-v", "/src:/src:ro"]
-    )
+    args = parser.parse_args(["new", "lab", "-v", "work:/work", "-v", "/src:/src:ro"])
     assert args.directory == "lab"
     assert args.volume == ["work:/work", "/src:/src:ro"]

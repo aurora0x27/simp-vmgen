@@ -6,7 +6,7 @@ stops and a commit message is provided.
 ## M1 - Project skeleton
 
 - [x] M1.1 Initialize the uv project, package layout, CLI entry point and test setup
-- [ ] M1.2 Add the configuration model, TOML loading/saving and validation
+- [x] M1.2 Add the configuration model, TOML loading/saving and validation
 - [ ] M1.3 Add distro discovery and the Ubuntu/Alpine metadata format
 - [ ] M1.4 Implement `new` (non-interactive) and `regen --check`
 - [ ] M1.5 Implement `diagnose`

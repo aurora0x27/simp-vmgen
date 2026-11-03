@@ -12,6 +12,12 @@ templates = "templates"
 [image_arches]
 x86_64 = "x86_64"
 
+[shell_paths]
+ash = "/bin/ash"
+bash = "/bin/bash"
+fish = "/usr/bin/fish"
+sh = "/bin/sh"
+
 [package_sets]
 base = [
     "bash",

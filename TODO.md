@@ -14,7 +14,7 @@ stops and a commit message is provided.
 ## M2 - Cloud-image environments
 
 - [x] M2.1 Image cache, checksum verification and `vmgen.lock`
-- [ ] M2.2 Cloud-init seed generation for Ubuntu
+- [x] M2.2 Cloud-init seed generation for Ubuntu
 - [ ] M2.3 QEMU argument builder and `build` / `run` / `stop` / `status`
 - [ ] M2.4 SSH key handling, `ssh` / `tty` / `guest` / `wait`
 - [ ] M2.5 `serial` / `console` / `log` / `clean`

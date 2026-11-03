@@ -12,6 +12,12 @@ templates = "templates"
 [image_arches]
 x86_64 = "amd64"
 
+[shell_paths]
+bash = "/usr/bin/bash"
+fish = "/usr/bin/fish"
+sh = "/bin/sh"
+zsh = "/usr/bin/zsh"
+
 [package_sets]
 base = [
     "ca-certificates",

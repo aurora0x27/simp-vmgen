@@ -30,6 +30,7 @@ _DISTRO_KEYS = {
     "ssh_service",
     "templates",
     "image_arches",
+    "shell_paths",
     "package_sets",
     "release",
 }
@@ -158,6 +159,7 @@ class Distro:
     ssh_service: str
     templates: str
     image_arches: dict[str, str]
+    shell_paths: dict[str, str]
     package_sets: dict[str, tuple[str, ...]]
 
     def release(self, version: str | None = None) -> DistroRelease:
@@ -173,6 +175,11 @@ class Distro:
     def image_arch(self, arch: str) -> str:
         return self.image_arches.get(arch, arch)
 
+    def shell_path(self, shell: str) -> str:
+        if shell.startswith("/"):
+            return shell
+        return self.shell_paths.get(shell, f"/bin/{shell}")
+
     def image_url(self, release: DistroRelease, arch: str) -> str:
         return release.image_url_for(self.image_arch(arch))
 
@@ -187,8 +194,7 @@ class Distro:
             except KeyError as exc:
                 available = ", ".join(sorted(self.package_sets))
                 raise DistroError(
-                    f"distro {self.name!r} has no package set {name!r} "
-                    f"(available: {available})"
+                    f"distro {self.name!r} has no package set {name!r} (available: {available})"
                 ) from exc
             for package in packages:
                 if package not in result:
@@ -208,9 +214,7 @@ def _parse_release(value: Any, where: str) -> DistroRelease:
 
     checksum = _string(table, "image_checksum", where)
     if checksum and _CHECKSUM_RE.match(checksum) is None:
-        raise DistroError(
-            f"{where}.image_checksum: expected sha256:<hex> or sha512:<hex>"
-        )
+        raise DistroError(f"{where}.image_checksum: expected sha256:<hex> or sha512:<hex>")
     checksum_url = _string(table, "image_checksum_url", where)
     if checksum_url:
         _http_url(
@@ -274,28 +278,31 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
     if len(set(versions)) != len(versions):
         raise DistroError(f"{source}.release: duplicate release versions")
 
-    default_release = _string(
-        data, "default_release", source, default=releases[0].version
-    )
+    default_release = _string(data, "default_release", source, default=releases[0].version)
     if default_release not in versions:
-        raise DistroError(
-            f"{source}.default_release: {default_release!r} is not in release"
-        )
+        raise DistroError(f"{source}.default_release: {default_release!r} is not in release")
 
-    image_arches_table = _table(
-        data.get("image_arches", {}), f"{source}.image_arches"
-    )
+    image_arches_table = _table(data.get("image_arches", {}), f"{source}.image_arches")
     image_arches: dict[str, str] = {}
     for arch, image_arch in image_arches_table.items():
         if arch not in architectures:
-            raise DistroError(
-                f"{source}.image_arches: {arch!r} is not in architectures"
-            )
+            raise DistroError(f"{source}.image_arches: {arch!r} is not in architectures")
         if not isinstance(image_arch, str) or not image_arch.strip():
-            raise DistroError(
-                f"{source}.image_arches.{arch}: expected a non-empty string"
-            )
+            raise DistroError(f"{source}.image_arches.{arch}: expected a non-empty string")
         image_arches[arch] = image_arch
+
+    shell_paths_table = _table(
+        data.get("shell_paths", {}), f"{source}.shell_paths"
+    )
+    shell_paths: dict[str, str] = {}
+    for shell, path in shell_paths_table.items():
+        if not isinstance(shell, str) or not shell.strip():
+            raise DistroError(f"{source}.shell_paths: invalid shell name {shell!r}")
+        if not isinstance(path, str) or not path.startswith("/"):
+            raise DistroError(
+                f"{source}.shell_paths.{shell}: expected an absolute path"
+            )
+        shell_paths[shell] = path
 
     package_sets_value = data.get("package_sets", {})
     package_sets_table = _table(package_sets_value, f"{source}.package_sets")
@@ -304,15 +311,12 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
         if not isinstance(set_name, str) or not set_name.strip():
             raise DistroError(f"{source}.package_sets: invalid set name {set_name!r}")
         if not isinstance(packages, list):
-            raise DistroError(
-                f"{source}.package_sets.{set_name}: expected an array of strings"
-            )
+            raise DistroError(f"{source}.package_sets.{set_name}: expected an array of strings")
         parsed_packages: list[str] = []
         for index, package in enumerate(packages):
             if not isinstance(package, str) or not package.strip():
                 raise DistroError(
-                    f"{source}.package_sets.{set_name}[{index}]: "
-                    "expected a non-empty string"
+                    f"{source}.package_sets.{set_name}[{index}]: expected a non-empty string"
                 )
             parsed_packages.append(package)
         package_sets[set_name] = tuple(parsed_packages)
@@ -340,6 +344,7 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
         ssh_service=_string(data, "ssh_service", source, default="ssh"),
         templates=_string(data, "templates", source, default="templates"),
         image_arches=image_arches,
+        shell_paths=shell_paths,
         package_sets=package_sets,
     )
 

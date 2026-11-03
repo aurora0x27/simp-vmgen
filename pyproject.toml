@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "jinja2>=3.1",
+    "shtab>=1.13.0",
     "tomli-w>=1.2",
 ]
 

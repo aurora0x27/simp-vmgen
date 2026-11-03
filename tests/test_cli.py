@@ -53,6 +53,21 @@ def test_kernel_subcommands_are_registered() -> None:
         assert args.kernel_command == name
 
 
+@pytest.mark.parametrize(
+    ("shell", "marker"),
+    [
+        ("bash", "complete"),
+        ("zsh", "#compdef simp-vmgen"),
+        ("fish", "complete -c simp-vmgen"),
+    ],
+)
+def test_completion_scripts(shell: str, marker: str, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["completion", shell]) == EXIT_OK
+    output = capsys.readouterr().out
+    assert marker in output
+    assert "simp-vmgen" in output
+
+
 def test_new_volume_options() -> None:
     parser = build_parser()
     args = parser.parse_args(["new", "lab", "-v", "work:/work", "-v", "/src:/src:ro"])

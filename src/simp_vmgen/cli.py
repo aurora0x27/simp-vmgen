@@ -6,6 +6,8 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+import shtab
+
 from . import __version__
 from .diagnose import diagnose
 from .errors import SimpVmgenError
@@ -79,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lifecycle(subparsers)
     _add_kernel(subparsers)
     _add_gdb(subparsers)
+    _add_completion(subparsers)
     return parser
 
 
@@ -339,6 +342,20 @@ def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--connect", action="store_true", help="start gdb automatically")
 
 
+def _add_completion(subparsers: argparse._SubParsersAction) -> None:
+    p = subparsers.add_parser(
+        "completion",
+        help="print a shell completion script",
+        description="Print completion code for bash, zsh or fish.",
+    )
+    p.add_argument("shell", choices=("bash", "zsh", "fish"))
+
+
+def print_completion(args: argparse.Namespace) -> int:
+    print(shtab.complete(build_parser(), args.shell), end="")
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -366,6 +383,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "clean": runtime_clean,
         "kernel": kernel_dispatch,
         "gdb": runtime_gdb,
+        "completion": print_completion,
     }
 
     try:

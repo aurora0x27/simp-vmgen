@@ -64,6 +64,7 @@ static busybox initramfs by default.
 | `status` / `stop` / `clean` | Inspect, stop or remove runtime state |
 | `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow |
 | `gdb` | Connect to the QEMU gdb stub |
+| `completion bash\|zsh\|fish` | Print a shell completion script |
 
 ### Project layout
 
@@ -211,6 +212,22 @@ simp-vmgen diagnose --json
 `diagnose` checks QEMU, image tooling, SSH, cloud-init seed tools, kernel build
 dependencies, `/dev/kvm`, cache permissions, disk space and configured ports.
 It exits non-zero when a required tool is missing.
+
+## Shell completion
+
+Completion scripts are generated with
+[shtab](https://github.com/tqdm/shtab):
+
+```sh
+# bash
+simp-vmgen completion bash > ~/.local/share/bash-completion/completions/simp-vmgen
+
+# zsh (ensure ~/.zfunc is in fpath)
+simp-vmgen completion zsh > ~/.zfunc/_simp-vmgen
+
+# fish
+simp-vmgen completion fish > ~/.config/fish/completions/simp-vmgen.fish
+```
 
 ## Troubleshooting
 

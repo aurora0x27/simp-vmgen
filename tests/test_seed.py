@@ -80,6 +80,55 @@ def test_render_ubuntu_user_data(tmp_path: Path) -> None:
     assert meta["local-hostname"] == "lab"
 
 
+def test_render_alpine_openrc_user_data(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    distro = load_distro("alpine")
+    artifacts = render_cloud_init(
+        config,
+        distro,
+        tmp_path,
+        tmp_path / "run",
+        generated_public_key="ssh-ed25519 AAAA generated",
+        make_iso=False,
+    )
+    data = yaml.safe_load(artifacts.user_data.read_text())
+    assert data["hostname"] == "lab"
+    assert [user["name"] for user in data["users"]] == ["root", "alice"]
+    assert data["users"][1]["shell"] == "/bin/bash"
+    assert "packages" not in data
+
+    files = {item["path"]: item for item in data["write_files"]}
+    sshd = files["/usr/local/sbin/simp-vmgen-ssh"]["content"]
+    assert "PermitRootLogin yes" in sshd
+    assert "PasswordAuthentication yes" in sshd
+    assert files["/etc/init.d/simp-vmgen-ready"]["content"].startswith(
+        "#!/sbin/openrc-run"
+    )
+
+    runcmd = "\n".join(data["runcmd"])
+    assert "apk add --no-cache" in runcmd
+    assert "build-base" not in runcmd
+    assert "rc-update add sshd default" in runcmd
+    assert "ttyS0::respawn" in runcmd
+    assert "rc-update add simp-vmgen-ready default" in runcmd
+    assert "deluser --remove-home alpine" in runcmd
+
+
+def test_alpine_keeps_alpine_user_if_configured(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    config.users.append(UserConfig("alpine", password="alpine-pw"))
+    config.ssh.user = "alice"
+    config.validate()
+    artifacts = render_cloud_init(
+        config,
+        load_distro("alpine"),
+        tmp_path,
+        tmp_path / "run",
+        make_iso=False,
+    )
+    assert "deluser --remove-home alpine" not in artifacts.user_data.read_text()
+
+
 def test_root_login_can_be_disabled(tmp_path: Path) -> None:
     config = _config(tmp_path)
     config.ssh.permit_root_login = False

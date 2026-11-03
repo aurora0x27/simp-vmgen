@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import (
     CONFIG_FILENAME,
+    DEFAULT_SSH_KEY,
     LOCK_FILENAME,
     Config,
     DistroConfig,
@@ -113,7 +114,7 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
         ssh=SshConfig(
             port=args.ssh_port,
             user=args.login_user,
-            key=args.ssh_key if args.ssh_key is not None else "vm/ssh/id_ed25519",
+            key=args.ssh_key if args.ssh_key is not None else DEFAULT_SSH_KEY,
         ),
         gdb=GdbConfig(enabled=args.gdb, port=args.gdb_port),
         mounts=_parse_mounts(args),

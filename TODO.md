@@ -16,7 +16,7 @@ stops and a commit message is provided.
 - [x] M2.1 Image cache, checksum verification and `vmgen.lock`
 - [x] M2.2 Cloud-init seed generation for Ubuntu
 - [x] M2.3 QEMU argument builder and `build` / `run` / `stop` / `status`
-- [ ] M2.4 SSH key handling, `ssh` / `tty` / `guest` / `wait`
+- [x] M2.4 SSH key handling, `ssh` / `tty` / `guest` / `wait`
 - [ ] M2.5 `serial` / `console` / `log` / `clean`
 - [ ] M2.6 User management: root login toggle, root password, multiple users,
       per-user password/SSH keys/shell/sudo

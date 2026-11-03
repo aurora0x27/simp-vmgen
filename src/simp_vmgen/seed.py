@@ -20,6 +20,8 @@ from .errors import ProjectError
 from .mounts import resolve_mounts
 from .users import provision_users
 
+READY_MARKER = "SIMP_VMGEN_READY"
+
 
 @dataclass(frozen=True, slots=True)
 class SeedArtifacts:
@@ -93,7 +95,7 @@ def _render_context(
         "mounts": mounts,
         "root_login": config.ssh.permit_root_login,
         "ssh_pwauth": any(user.password for user in users),
-        "ready_marker": f"SIMP_VMGEN_READY name={hostname}",
+        "ready_marker": f"{READY_MARKER} name={hostname}",
         "generated_public_key": generated_public_key,
     }
     return context

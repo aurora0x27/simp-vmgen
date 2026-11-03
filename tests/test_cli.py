@@ -54,7 +54,7 @@ def test_kernel_subcommands_are_registered() -> None:
 
 
 def test_placeholder_handler(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["wait"]) == EXIT_NOT_IMPLEMENTED
+    assert main(["serial"]) == EXIT_NOT_IMPLEMENTED
     assert "not implemented yet" in capsys.readouterr().err
 
 

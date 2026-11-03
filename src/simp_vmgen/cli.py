@@ -11,9 +11,13 @@ from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .project import new_project, regen_project
 from .runtime import build as runtime_build
+from .runtime import guest as runtime_guest
 from .runtime import run as runtime_run
+from .runtime import ssh as runtime_ssh
 from .runtime import status as runtime_status
 from .runtime import stop as runtime_stop
+from .runtime import tty as runtime_tty
+from .runtime import wait as runtime_wait
 
 PROG = "simp-vmgen"
 
@@ -146,6 +150,17 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--kernel-version", metavar="VERSION")
     p.add_argument("--rootfs", default="busybox", metavar="NAME")
     p.add_argument("--force", action="store_true", help="overwrite a non-empty directory")
+    _add_local_dry_run(p)
+
+
+def _add_local_dry_run(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="print what would happen without changing anything",
+    )
 
 
 def _add_regen(subparsers: argparse._SubParsersAction) -> None:
@@ -201,9 +216,11 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
 
         if name == "build":
             p.add_argument("--force", action="store_true", help="rebuild artifacts")
+            _add_local_dry_run(p)
         elif name == "run":
             p.add_argument("--foreground", action="store_true", help="do not daemonize")
             p.add_argument("--snapshot", action="store_true", help="discard writes on exit")
+            _add_local_dry_run(p)
         elif name == "wait":
             p.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
         elif name in ("ssh", "guest"):
@@ -270,13 +287,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "run": runtime_run,
         "stop": runtime_stop,
         "status": runtime_status,
-        "wait": _not_implemented,
-        "ssh": _not_implemented,
-        "tty": _not_implemented,
+        "wait": runtime_wait,
+        "ssh": runtime_ssh,
+        "tty": runtime_tty,
         "serial": _not_implemented,
         "console": _not_implemented,
         "log": _not_implemented,
-        "guest": _not_implemented,
+        "guest": runtime_guest,
         "clean": _not_implemented,
         "kernel": _not_implemented,
         "gdb": _not_implemented,

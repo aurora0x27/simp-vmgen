@@ -17,6 +17,7 @@ from .errors import ConfigError
 SCHEMA_VERSION = 1
 CONFIG_FILENAME = "vmgen.toml"
 LOCK_FILENAME = "vmgen.lock"
+DEFAULT_SSH_KEY = ".simp-vmgen/ssh/id_ed25519"
 
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _USER_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
@@ -167,7 +168,7 @@ class SshConfig:
     host: str = "127.0.0.1"
     port: int | str = "auto"
     user: str = "root"
-    key: str = "vm/ssh/id_ed25519"
+    key: str = DEFAULT_SSH_KEY
     permit_root_login: bool = True
     wait_timeout: int = 900
 
@@ -356,7 +357,9 @@ class Config:
             host=_string(ssh_table, "host", f"{source}.ssh", default="127.0.0.1"),
             port=_port(ssh_table.get("port", "auto"), f"{source}.ssh.port"),
             user=_string(ssh_table, "user", f"{source}.ssh", default="root"),
-            key=_string(ssh_table, "key", f"{source}.ssh", default="vm/ssh/id_ed25519"),
+            key=_string(
+                ssh_table, "key", f"{source}.ssh", default=DEFAULT_SSH_KEY
+            ),
             permit_root_login=_bool(ssh_table, "permit_root_login", f"{source}.ssh", default=True),
             wait_timeout=_int(ssh_table, "wait_timeout", f"{source}.ssh", default=900, minimum=1),
         )

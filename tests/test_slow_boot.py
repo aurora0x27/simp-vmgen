@@ -33,9 +33,7 @@ def _stop(root: Path) -> None:
 def test_alpine_cloud_image_boot(tmp_path: Path) -> None:
     if shutil.which("qemu-system-x86_64") is None or shutil.which("qemu-img") is None:
         pytest.skip("QEMU is not installed")
-    if not any(
-        shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")
-    ):
+    if not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")):
         pytest.skip("no cloud-init seed tool")
 
     root = tmp_path / "alpine-lab"

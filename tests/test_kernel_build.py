@@ -54,9 +54,7 @@ def test_kernel_build_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(
         kernel,
         "resolve_source",
-        lambda *args, **kwargs: KernelSourceInfo(
-            mode="tarball", path=source, version="6.1.0"
-        ),
+        lambda *args, **kwargs: KernelSourceInfo(mode="tarball", path=source, version="6.1.0"),
     )
     assert kernel.kernel_build(SimpleNamespace(directory=str(tmp_path), dry_run=False)) == 0
     assert (layout.kernel_dir / "build" / "arch/x86/boot/bzImage").is_file()
@@ -72,9 +70,7 @@ def test_kernel_build_dry_run(
     monkeypatch.setattr(
         kernel,
         "resolve_source",
-        lambda *args, **kwargs: KernelSourceInfo(
-            mode="tarball", path=source, version="6.1.0"
-        ),
+        lambda *args, **kwargs: KernelSourceInfo(mode="tarball", path=source, version="6.1.0"),
     )
     assert kernel.kernel_build(SimpleNamespace(directory=str(tmp_path), dry_run=True)) == 0
     assert not (layout.kernel_dir / "build" / "arch/x86/boot/bzImage").exists()

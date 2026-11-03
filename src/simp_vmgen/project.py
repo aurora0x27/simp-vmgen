@@ -126,9 +126,7 @@ def _parse_kernel_options(values: list[str]) -> dict[str, str]:
     for value in values:
         name, separator, option_value = value.partition("=")
         if not separator or not name or not option_value:
-            raise ProjectError(
-                f"invalid --kernel-option {value!r}: expected CONFIG_X=Y"
-            )
+            raise ProjectError(f"invalid --kernel-option {value!r}: expected CONFIG_X=Y")
         options[name] = option_value
     return options
 
@@ -143,10 +141,7 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
     release = distro.release(args.release)
 
     kernel_enabled = bool(
-        args.kernel
-        or args.kernel_version
-        or args.kernel_commit
-        or args.kernel_artifact
+        args.kernel or args.kernel_version or args.kernel_commit or args.kernel_artifact
     )
     kernel_mode = "artifact" if args.kernel_artifact else "build"
     kernel_version = args.kernel_version or ""

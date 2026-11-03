@@ -28,10 +28,7 @@ class KernelSourceInfo:
 
 def kernel_url(version: str) -> str:
     major = version.split(".", 1)[0]
-    return (
-        f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/"
-        f"linux-{version}.tar.xz"
-    )
+    return f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
 
 
 def kernel_checksum_url(version: str) -> str:
@@ -72,9 +69,7 @@ def _extract_tarball(tarball: Path, destination: Path) -> Path:
     raise ProjectError(f"cannot locate the extracted kernel tree under {destination}")
 
 
-def _fetch_tarball(
-    config: Config, layout: ProjectLayout, *, dry_run: bool
-) -> KernelSourceInfo:
+def _fetch_tarball(config: Config, layout: ProjectLayout, *, dry_run: bool) -> KernelSourceInfo:
     kernel = config.kernel
     url = kernel.source_url or kernel_url(kernel.version)
     filename = Path(urlparse(url).path).name
@@ -82,9 +77,7 @@ def _fetch_tarball(
         raise ProjectError(f"cannot determine kernel tarball name from {url!r}")
     checksum_url = "" if kernel.source_url else kernel_checksum_url(kernel.version)
     if not kernel.source_checksum and not checksum_url:
-        raise ProjectError(
-            "custom kernel source_url requires source_checksum for reproducibility"
-        )
+        raise ProjectError("custom kernel source_url requires source_checksum for reproducibility")
     destination = layout.kernel_dir / "src"
     tree = destination / f"linux-{kernel.version}"
     if dry_run:
@@ -155,9 +148,7 @@ def _git_fetch(config: Config, tree: Path) -> str:
     return _run([git, "rev-parse", "HEAD"], "cannot resolve kernel commit", cwd=tree)
 
 
-def _fetch_git(
-    config: Config, layout: ProjectLayout, *, dry_run: bool
-) -> KernelSourceInfo:
+def _fetch_git(config: Config, layout: ProjectLayout, *, dry_run: bool) -> KernelSourceInfo:
     tree = layout.kernel_dir / "src" / "linux-git"
     if dry_run:
         return KernelSourceInfo(

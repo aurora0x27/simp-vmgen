@@ -115,9 +115,7 @@ class Lock:
                 repo=_string(kernel, "repo", f"{source}.kernel"),
                 commit=_string(kernel, "commit", f"{source}.kernel"),
                 artifact=_string(kernel, "artifact", f"{source}.kernel"),
-                artifact_checksum=_string(
-                    kernel, "artifact_checksum", f"{source}.kernel"
-                ),
+                artifact_checksum=_string(kernel, "artifact_checksum", f"{source}.kernel"),
             ),
             tool_version=_string(tool, "version", f"{source}.tool", __version__),
         )

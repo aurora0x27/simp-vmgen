@@ -27,23 +27,20 @@ def _project(tmp_path: Path) -> tuple[Path, Path, Path]:
     return root, artifact, initrd
 
 
-def test_build_and_run_artifact(
-    tmp_path: Path, capsys
-) -> None:
+def test_build_and_run_artifact(tmp_path: Path, capsys) -> None:
     root, artifact, initrd = _project(tmp_path)
-    assert runtime.build(
-        SimpleNamespace(directory=str(root), dry_run=False, force=False)
-    ) == 0
+    assert runtime.build(SimpleNamespace(directory=str(root), dry_run=False, force=False)) == 0
     out = capsys.readouterr().out
     assert str(artifact) in out
     assert str(initrd) in out
     assert not (root / ".simp-vmgen" / "run" / "overlay.qcow2").exists()
 
-    assert runtime.run(
-        SimpleNamespace(
-            directory=str(root), dry_run=True, foreground=False, snapshot=False
+    assert (
+        runtime.run(
+            SimpleNamespace(directory=str(root), dry_run=True, foreground=False, snapshot=False)
         )
-    ) == 0
+        == 0
+    )
     command = capsys.readouterr().out
     assert "-kernel" in command
     assert str(artifact) in command

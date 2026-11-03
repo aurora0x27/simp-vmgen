@@ -66,9 +66,7 @@ def test_kernel_config_dry_run(
     monkeypatch.setattr(
         kernel,
         "resolve_source",
-        lambda *args, **kwargs: KernelSourceInfo(
-            mode="tarball", path=source, version="6.1.0"
-        ),
+        lambda *args, **kwargs: KernelSourceInfo(mode="tarball", path=source, version="6.1.0"),
     )
     args = SimpleNamespace(directory=str(tmp_path), dry_run=True)
     assert kernel.kernel_config(args) == 0
@@ -80,9 +78,7 @@ def test_kernel_config_rejects_artifact(tmp_path: Path) -> None:
     artifact = tmp_path / "bzImage"
     artifact.write_bytes(b"x")
     config = Config.default("lab")
-    config.kernel = KernelConfig(
-        enabled=True, mode="artifact", artifact=str(artifact)
-    )
+    config.kernel = KernelConfig(enabled=True, mode="artifact", artifact=str(artifact))
     config.validate()
     config.save(tmp_path / "vmgen.toml")
     with pytest.raises(ProjectError, match="artifact mode"):

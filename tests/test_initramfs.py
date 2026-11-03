@@ -42,9 +42,7 @@ def test_build_initramfs(tmp_path: Path) -> None:
     assert (layout.kernel_dir / "initramfs" / "lib" / "modules" / "6.1.0" / "modules.dep").is_file()
 
     archive = gzip.decompress(output.read_bytes())
-    result = subprocess.run(
-        ["cpio", "-it"], input=archive, capture_output=True, check=False
-    )
+    result = subprocess.run(["cpio", "-it"], input=archive, capture_output=True, check=False)
     listing = result.stdout.decode()
     assert "init" in listing
     assert "bin/busybox" in listing

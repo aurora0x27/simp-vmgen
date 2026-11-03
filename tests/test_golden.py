@@ -35,9 +35,9 @@ def test_cloud_init_matches_golden(distro: str, tmp_path: Path) -> None:
         generated_public_key="ssh-ed25519 AAAA generated",
         make_iso=False,
     )
-    assert artifacts.user_data.read_text(encoding="utf-8") == (
-        directory / "user-data"
-    ).read_text(encoding="utf-8")
-    assert artifacts.meta_data.read_text(encoding="utf-8") == (
-        directory / "meta-data"
-    ).read_text(encoding="utf-8")
+    assert artifacts.user_data.read_text(encoding="utf-8") == (directory / "user-data").read_text(
+        encoding="utf-8"
+    )
+    assert artifacts.meta_data.read_text(encoding="utf-8") == (directory / "meta-data").read_text(
+        encoding="utf-8"
+    )

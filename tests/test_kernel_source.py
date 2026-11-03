@@ -46,17 +46,13 @@ def test_artifact_mode(tmp_path: Path) -> None:
 
 
 def test_missing_artifact(tmp_path: Path) -> None:
-    config = _kernel_config(
-        tmp_path, mode="artifact", artifact=str(tmp_path / "missing")
-    )
+    config = _kernel_config(tmp_path, mode="artifact", artifact=str(tmp_path / "missing"))
     layout = ProjectLayout(tmp_path, config)
     with pytest.raises(ProjectError, match="artifact not found"):
         kernel_source.resolve_source(config, tmp_path, layout)
 
 
-def test_tarball_extraction(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_tarball_extraction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_root = tmp_path / "fake-linux"
     (source_root / "linux-6.1.0").mkdir(parents=True)
     (source_root / "linux-6.1.0" / "Makefile").write_text("all:\n")

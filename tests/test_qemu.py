@@ -77,9 +77,7 @@ def test_forced_kvm_fails_without_kvm(tmp_path: Path, monkeypatch: pytest.Monkey
         resolve_accel(layout.config)
 
 
-def test_kernel_artifact_argv(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_kernel_artifact_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("simp_vmgen.qemu.kvm_available", lambda: False)
     layout = _layout(tmp_path)
     artifact = tmp_path / "bzImage"

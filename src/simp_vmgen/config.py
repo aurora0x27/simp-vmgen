@@ -19,9 +19,7 @@ CONFIG_FILENAME = "vmgen.toml"
 LOCK_FILENAME = "vmgen.lock"
 DEFAULT_SSH_KEY = ".simp-vmgen/ssh/id_ed25519"
 DEFAULT_ROOT_PASSWORD = "114514"
-DEFAULT_KERNEL_REPO = (
-    "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
-)
+DEFAULT_KERNEL_REPO = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
 
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _USER_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
@@ -106,9 +104,7 @@ def _string_list(table: dict[str, Any], key: str, where: str) -> list[str]:
     return result
 
 
-def _config_options(
-    table: dict[str, Any], key: str, where: str
-) -> dict[str, str]:
+def _config_options(table: dict[str, Any], key: str, where: str) -> dict[str, str]:
     value = table.get(key, {})
     if not isinstance(value, dict):
         raise ConfigError(f"{where}.{key}: expected a table")
@@ -123,9 +119,7 @@ def _config_options(
         elif isinstance(raw, str):
             option_value = raw
         else:
-            raise ConfigError(
-                f"{where}.{key}.{name}: expected a string, integer or boolean"
-            )
+            raise ConfigError(f"{where}.{key}.{name}: expected a string, integer or boolean")
         result[name] = option_value
     return result
 
@@ -470,21 +464,14 @@ class Config:
                 default=DEFAULT_KERNEL_REPO,
             ),
             source_url=_string(kernel_table, "source_url", f"{source}.kernel"),
-            source_checksum=_string(
-                kernel_table, "source_checksum", f"{source}.kernel"
-            ),
-            config=_string(
-                kernel_table, "config", f"{source}.kernel", default="defconfig"
-            ),
+            source_checksum=_string(kernel_table, "source_checksum", f"{source}.kernel"),
+            config=_string(kernel_table, "config", f"{source}.kernel", default="defconfig"),
             fragments=_string_list(kernel_table, "fragments", f"{source}.kernel"),
             options=_config_options(kernel_table, "options", f"{source}.kernel"),
-            targets=_string_list(kernel_table, "targets", f"{source}.kernel")
-            or ["bzImage"],
+            targets=_string_list(kernel_table, "targets", f"{source}.kernel") or ["bzImage"],
             make_args=_string_list(kernel_table, "make_args", f"{source}.kernel"),
             jobs=_int(kernel_table, "jobs", f"{source}.kernel", default=0, minimum=0),
-            rootfs=_string(
-                kernel_table, "rootfs", f"{source}.kernel", default="busybox"
-            ),
+            rootfs=_string(kernel_table, "rootfs", f"{source}.kernel", default="busybox"),
             artifact=_string(kernel_table, "artifact", f"{source}.kernel"),
             artifact_type=_string(
                 kernel_table,
@@ -608,9 +595,7 @@ class Config:
             normalized_options: dict[str, str] = {}
             for name, raw in kernel.options.items():
                 if _CONFIG_OPTION_RE.match(name) is None:
-                    raise ConfigError(
-                        f"{source}.kernel.options: invalid Kconfig option {name!r}"
-                    )
+                    raise ConfigError(f"{source}.kernel.options: invalid Kconfig option {name!r}")
                 if isinstance(raw, bool):
                     normalized_options[name] = "y" if raw else "n"
                 elif isinstance(raw, int):
@@ -618,22 +603,17 @@ class Config:
                 elif isinstance(raw, str):
                     normalized_options[name] = raw
                 else:
-                    raise ConfigError(
-                        f"{source}.kernel.options.{name}: invalid value {raw!r}"
-                    )
+                    raise ConfigError(f"{source}.kernel.options.{name}: invalid value {raw!r}")
             kernel.options = normalized_options
             if kernel.mode not in _KERNEL_MODES:
                 raise ConfigError(
-                    f"{source}.kernel.mode: expected one of "
-                    f"{', '.join(sorted(_KERNEL_MODES))}"
+                    f"{source}.kernel.mode: expected one of {', '.join(sorted(_KERNEL_MODES))}"
                 )
             if kernel.artifact:
                 kernel.mode = "artifact"
             if kernel.mode == "artifact":
                 if not kernel.artifact:
-                    raise ConfigError(
-                        f"{source}.kernel.artifact: required in artifact mode"
-                    )
+                    raise ConfigError(f"{source}.kernel.artifact: required in artifact mode")
                 if kernel.version or kernel.commit:
                     raise ConfigError(
                         f"{source}.kernel: artifact mode cannot use version or commit"
@@ -645,9 +625,7 @@ class Config:
                     )
             else:
                 if kernel.version and kernel.commit:
-                    raise ConfigError(
-                        f"{source}.kernel: version and commit are mutually exclusive"
-                    )
+                    raise ConfigError(f"{source}.kernel: version and commit are mutually exclusive")
                 if not kernel.version and not kernel.commit:
                     raise ConfigError(
                         f"{source}.kernel: version or commit is required in build mode"
@@ -662,20 +640,14 @@ class Config:
                     )
                 if kernel.commit and not kernel.repo:
                     raise ConfigError(f"{source}.kernel.repo: must not be empty")
-                if kernel.source_url and not kernel.source_url.startswith(
-                    ("http://", "https://")
-                ):
-                    raise ConfigError(
-                        f"{source}.kernel.source_url: expected an http(s) URL"
-                    )
+                if kernel.source_url and not kernel.source_url.startswith(("http://", "https://")):
+                    raise ConfigError(f"{source}.kernel.source_url: expected an http(s) URL")
                 if not kernel.config.strip():
                     raise ConfigError(f"{source}.kernel.config: must not be empty")
                 if not kernel.targets:
                     raise ConfigError(f"{source}.kernel.targets: at least one target is required")
             if kernel.rootfs not in ("busybox", "none"):
-                raise ConfigError(
-                    f"{source}.kernel.rootfs: expected 'busybox' or 'none'"
-                )
+                raise ConfigError(f"{source}.kernel.rootfs: expected 'busybox' or 'none'")
 
     def get_user(self, name: str) -> UserConfig:
         for user in self.users:

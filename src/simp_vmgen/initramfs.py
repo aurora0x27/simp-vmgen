@@ -150,12 +150,16 @@ def build_initramfs(
         _install_applets(rootfs / "bin" / "busybox", rootfs)
 
     mounts = resolve_mounts(config, layout.root)
-    init = _environment().get_template("initramfs/init.j2").render(
-        config=config,
-        tool_version=__version__,
-        hostname=config.project.hostname,
-        mounts=mounts,
-        ready_marker=f"{READY_MARKER} name={config.project.hostname}",
+    init = (
+        _environment()
+        .get_template("initramfs/init.j2")
+        .render(
+            config=config,
+            tool_version=__version__,
+            hostname=config.project.hostname,
+            mounts=mounts,
+            ready_marker=f"{READY_MARKER} name={config.project.hostname}",
+        )
     )
     _write(rootfs / "init", init, mode=0o755)
     _write(rootfs / "etc" / "hostname", f"{config.project.hostname}\n")

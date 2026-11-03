@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import contextlib
+import os
+import shutil
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from simp_vmgen import runtime
+from simp_vmgen.cli import main
+
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        os.environ.get("SIMP_VMGEN_SLOW") != "1",
+        reason="set SIMP_VMGEN_SLOW=1 to run boot integration tests",
+    ),
+]
+
+
+def _args(root: Path, **kwargs) -> SimpleNamespace:
+    return SimpleNamespace(directory=str(root), **kwargs)
+
+
+def _stop(root: Path) -> None:
+    with contextlib.suppress(Exception):
+        runtime.stop(_args(root))
+
+
+def test_alpine_cloud_image_boot(tmp_path: Path) -> None:
+    if shutil.which("qemu-system-x86_64") is None or shutil.which("qemu-img") is None:
+        pytest.skip("QEMU is not installed")
+    if not any(
+        shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")
+    ):
+        pytest.skip("no cloud-init seed tool")
+
+    root = tmp_path / "alpine-lab"
+    assert (
+        main(
+            [
+                "new",
+                str(root),
+                "--distro",
+                "alpine",
+                "--mem",
+                "2G",
+                "--cpus",
+                "2",
+            ]
+        )
+        == 0
+    )
+    try:
+        assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+        assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
+        assert runtime.wait(_args(root, timeout=600)) == 0
+        assert runtime.guest(_args(root, guest_command=["sh", "-c", "uname -s"])) == 0
+    finally:
+        _stop(root)
+
+
+def test_kernel_artifact_boot(tmp_path: Path) -> None:
+    kernel_image = Path("/boot/vmlinuz-linux")
+    if not kernel_image.is_file():
+        pytest.skip("no host vmlinuz to boot")
+    if shutil.which("qemu-system-x86_64") is None or shutil.which("cpio") is None:
+        pytest.skip("QEMU or cpio is not installed")
+
+    root = tmp_path / "kernel-artifact"
+    assert (
+        main(
+            [
+                "new",
+                str(root),
+                "--kernel-artifact",
+                str(kernel_image),
+                "--kernel-artifact-type",
+                "vmlinuz",
+                "--mem",
+                "1G",
+                "--cpus",
+                "1",
+            ]
+        )
+        == 0
+    )
+    try:
+        assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+        assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
+        assert runtime.wait(_args(root, timeout=120)) == 0
+    finally:
+        _stop(root)

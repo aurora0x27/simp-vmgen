@@ -9,6 +9,9 @@ default_shell = "sh"
 ssh_service = "sshd"
 templates = "templates"
 
+[image_arches]
+x86_64 = "x86_64"
+
 [package_sets]
 base = [
     "bash",

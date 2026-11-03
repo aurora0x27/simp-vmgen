@@ -7,6 +7,8 @@ import sys
 from collections.abc import Sequence
 
 from . import __version__
+from .errors import SimpVmgenError
+from .project import new_project, regen_project
 
 PROG = "simp-vmgen"
 
@@ -77,9 +79,9 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--distro", metavar="NAME", help="distro name (ubuntu, alpine)")
     p.add_argument("--release", metavar="VERSION", help="distro release")
     p.add_argument("--arch", default="x86_64", metavar="ARCH")
-    p.add_argument("--mem", default="4G", metavar="SIZE")
-    p.add_argument("--cpus", default=4, type=int, metavar="N")
-    p.add_argument("--disk", default="30G", metavar="SIZE")
+    p.add_argument("--mem", default=None, metavar="SIZE")
+    p.add_argument("--cpus", default=None, type=int, metavar="N")
+    p.add_argument("--disk", default=None, metavar="SIZE")
     p.add_argument(
         "--accel",
         choices=("auto", "kvm", "tcg"),
@@ -111,7 +113,29 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
         metavar="PKG",
         help="extra guest package (repeatable)",
     )
-    p.add_argument("--ssh-key", metavar="PATH", help="public key for guest login")
+    p.add_argument(
+        "--ssh-key",
+        metavar="PATH",
+        help="existing private key to use (its .pub file is installed in the guest)",
+    )
+    p.add_argument(
+        "--login-user",
+        default="root",
+        metavar="NAME",
+        help="default SSH login user (default: root)",
+    )
+    p.add_argument(
+        "--user",
+        action="append",
+        default=[],
+        metavar="NAME[:PASSWORD]",
+        help="add a guest user (repeatable)",
+    )
+    p.add_argument(
+        "--no-root-user",
+        action="store_true",
+        help="do not create the default root account",
+    )
     p.add_argument("--root-password", metavar="PASSWORD")
     p.add_argument("--kernel", action="store_true", help="enable a custom kernel")
     p.add_argument("--kernel-version", metavar="VERSION")
@@ -233,8 +257,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_OK
 
     handlers = {
-        "new": _not_implemented,
-        "regen": _not_implemented,
+        "new": new_project,
+        "regen": regen_project,
         "diagnose": _not_implemented,
         "show": _not_implemented,
         "build": _not_implemented,
@@ -255,6 +279,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         return handlers[args.command](args)
+    except SimpVmgenError as exc:
+        print(f"{PROG}: {exc}", file=sys.stderr)
+        return EXIT_ERROR
     except KeyboardInterrupt:
         print(f"{PROG}: interrupted", file=sys.stderr)
         return 130

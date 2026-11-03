@@ -13,3 +13,7 @@ class ConfigError(SimpVmgenError):
 
 class DistroError(SimpVmgenError):
     """Unknown distro or invalid distro metadata."""
+
+
+class ProjectError(SimpVmgenError):
+    """Project creation, discovery or regeneration failure."""

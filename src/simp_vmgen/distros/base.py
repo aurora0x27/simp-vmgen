@@ -29,6 +29,7 @@ _DISTRO_KEYS = {
     "default_shell",
     "ssh_service",
     "templates",
+    "image_arches",
     "package_sets",
     "release",
 }
@@ -156,6 +157,7 @@ class Distro:
     default_shell: str
     ssh_service: str
     templates: str
+    image_arches: dict[str, str]
     package_sets: dict[str, tuple[str, ...]]
 
     def release(self, version: str | None = None) -> DistroRelease:
@@ -167,6 +169,15 @@ class Distro:
         raise DistroError(
             f"distro {self.name!r} has no release {wanted!r} (available: {available})"
         )
+
+    def image_arch(self, arch: str) -> str:
+        return self.image_arches.get(arch, arch)
+
+    def image_url(self, release: DistroRelease, arch: str) -> str:
+        return release.image_url_for(self.image_arch(arch))
+
+    def checksum_url(self, release: DistroRelease, arch: str) -> str:
+        return release.checksum_url_for(self.image_arch(arch))
 
     def packages(self, set_names: list[str], extra: list[str] | None = None) -> list[str]:
         result: list[str] = []
@@ -271,6 +282,21 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
             f"{source}.default_release: {default_release!r} is not in release"
         )
 
+    image_arches_table = _table(
+        data.get("image_arches", {}), f"{source}.image_arches"
+    )
+    image_arches: dict[str, str] = {}
+    for arch, image_arch in image_arches_table.items():
+        if arch not in architectures:
+            raise DistroError(
+                f"{source}.image_arches: {arch!r} is not in architectures"
+            )
+        if not isinstance(image_arch, str) or not image_arch.strip():
+            raise DistroError(
+                f"{source}.image_arches.{arch}: expected a non-empty string"
+            )
+        image_arches[arch] = image_arch
+
     package_sets_value = data.get("package_sets", {})
     package_sets_table = _table(package_sets_value, f"{source}.package_sets")
     package_sets: dict[str, tuple[str, ...]] = {}
@@ -313,6 +339,7 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
         default_shell=_string(data, "default_shell", source, default="sh"),
         ssh_service=_string(data, "ssh_service", source, default="ssh"),
         templates=_string(data, "templates", source, default="templates"),
+        image_arches=image_arches,
         package_sets=package_sets,
     )
 

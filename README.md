@@ -20,9 +20,9 @@ replacement for tools such as `virtme-ng`.
 ## Status
 
 Usable for cloud-image labs, Alpine/Ubuntu experiments, custom kernel builds
-and existing kernel artifacts. See [TODO.md](TODO.md) for the remaining polish
-work and [docs/configuration.md](docs/configuration.md) for the full config
-reference.
+and existing kernel artifacts. See [AGENTS.md](AGENTS.md) for architecture and
+development guidance, and [docs/configuration.md](docs/configuration.md) for
+the full config reference.
 
 ## Install
 

@@ -26,8 +26,9 @@ from .config import (
 from .distros import load_distro
 from .errors import ProjectError
 from .lock import create_lock
+from .manifest import GeneratedManifest
 from .paths import load_project
-from .render import changed_files, render_project, write_rendered
+from .render import render_project, write_rendered
 from .wizard import run_wizard
 
 DEFAULT_KERNEL_VERSION = "6.12.5"
@@ -204,6 +205,10 @@ def new_project(args: argparse.Namespace) -> int:
     release = distro.release(config.distro.release)
     create_lock(config, distro, release).save(target / LOCK_FILENAME)
     wrote = write_rendered(target, files)
+    manifest = GeneratedManifest()
+    for item in files:
+        manifest.record(item.path, item.content)
+    manifest.save(GeneratedManifest.path(target))
     print(f"created {target}")
     print(f"  config: {target / CONFIG_FILENAME}")
     print(f"  lock:   {target / LOCK_FILENAME}")
@@ -222,22 +227,57 @@ def new_project(args: argparse.Namespace) -> int:
 def regen_project(args: argparse.Namespace) -> int:
     root, config = load_project(args.directory)
     files = render_project(config)
-    changed = changed_files(root, files)
+    manifest_path = GeneratedManifest.path(root)
+    manifest = GeneratedManifest.load(manifest_path)
+
+    updates = []
+    conflicts = []
+    unchanged = []
+    for item in files:
+        path = root / item.path
+        try:
+            current = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            updates.append(item)
+            continue
+        except OSError as exc:
+            raise ProjectError(f"cannot read {path}: {exc}") from exc
+        if current == item.content:
+            unchanged.append(item)
+        elif manifest.is_unmodified(item.path, current):
+            updates.append(item)
+        else:
+            conflicts.append(item)
 
     if args.check:
-        if not changed:
-            print(f"{root}: generated files are up to date")
-            return 0
-        for item in changed:
+        for item in updates:
             print(f"would update {root / item.path}")
-        return 1
-
-    if not changed:
+        for item in conflicts:
+            print(f"conflict    {root / item.path}")
+        if updates or conflicts:
+            return 1
         print(f"{root}: generated files are up to date")
         return 0
 
-    to_write = files if args.force else changed
-    write_rendered(root, to_write)
+    to_write = files if args.force else updates
+    if to_write:
+        write_rendered(root, to_write)
+
+    written = {item.path for item in to_write}
+    for item in files:
+        if item.path in written or item in unchanged:
+            manifest.record(item.path, item.content)
+    manifest.save(manifest_path)
+
     for item in to_write:
         print(f"updated {root / item.path}")
+    if conflicts and not args.force:
+        for item in conflicts:
+            print(
+                f"conflict {root / item.path}: locally modified "
+                "(use --force to overwrite)"
+            )
+        return 1
+    if not to_write and not conflicts:
+        print(f"{root}: generated files are up to date")
     return 0

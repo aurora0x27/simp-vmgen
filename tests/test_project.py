@@ -24,6 +24,7 @@ def test_new_ubuntu_project(tmp_path: Path) -> None:
     assert "SIMP_VMGEN ?= simp-vmgen" in (target / "Makefile").read_text()
     assert "make build" in (target / "README.md").read_text()
     assert ".simp-vmgen/" in (target / ".gitignore").read_text()
+    assert (target / ".simp-vmgen" / "generated.json").is_file()
 
 
 def test_new_alpine_uses_distro_defaults(tmp_path: Path) -> None:
@@ -162,9 +163,39 @@ def test_regen_check_and_update(tmp_path: Path) -> None:
     makefile = target / "Makefile"
     makefile.write_text("# locally modified\n", encoding="utf-8")
     assert main(["-C", str(target), "regen", "--check"]) == EXIT_ERROR
+    assert main(["-C", str(target), "regen"]) == EXIT_ERROR
+    assert makefile.read_text() == "# locally modified\n"
+
+    assert main(["-C", str(target), "regen", "--force"]) == EXIT_OK
+    assert "SIMP_VMGEN ?= simp-vmgen" in makefile.read_text()
+
+
+def test_regen_updates_stale_generated_file(tmp_path: Path) -> None:
+    from simp_vmgen.manifest import GeneratedManifest, text_hash
+
+    target = tmp_path / "stale"
+    assert main(["new", str(target)]) == EXIT_OK
+    makefile = target / "Makefile"
+    stale = "# old generated content\n"
+    makefile.write_text(stale, encoding="utf-8")
+    manifest = GeneratedManifest.load(GeneratedManifest.path(target))
+    manifest.files["Makefile"] = text_hash(stale)
+    manifest.save(GeneratedManifest.path(target))
 
     assert main(["-C", str(target), "regen"]) == EXIT_OK
     assert "SIMP_VMGEN ?= simp-vmgen" in makefile.read_text()
+
+
+def test_regen_missing_manifest_treats_files_as_modified(tmp_path: Path) -> None:
+    target = tmp_path / "no-manifest"
+    assert main(["new", str(target)]) == EXIT_OK
+    (target / ".simp-vmgen" / "generated.json").unlink()
+    makefile = target / "Makefile"
+    makefile.write_text("# local\n", encoding="utf-8")
+
+    assert main(["-C", str(target), "regen"]) == EXIT_ERROR
+    assert makefile.read_text() == "# local\n"
+    assert main(["-C", str(target), "regen", "--force"]) == EXIT_OK
 
 
 def test_regen_discovers_project_from_subdirectory(tmp_path: Path) -> None:

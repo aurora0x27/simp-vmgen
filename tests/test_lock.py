@@ -21,6 +21,27 @@ def test_create_lock_for_ubuntu() -> None:
     assert lock.image_checksum_url.endswith("/SHA256SUMS")
 
 
+def test_create_lock_for_kernel_version() -> None:
+    config = Config.default("lab")
+    config.kernel.enabled = True
+    config.kernel.version = "6.12.5"
+    distro = load_distro("ubuntu")
+    lock = create_lock(config, distro, distro.release())
+    assert lock.kernel.source == "tarball"
+    assert lock.kernel.version == "6.12.5"
+
+
+def test_create_lock_for_kernel_commit() -> None:
+    config = Config.default("lab")
+    config.kernel.enabled = True
+    config.kernel.commit = "a" * 40
+    config.kernel.repo = "https://example.invalid/linux.git"
+    distro = load_distro("ubuntu")
+    lock = create_lock(config, distro, distro.release())
+    assert lock.kernel.source == "git"
+    assert lock.kernel.commit == "a" * 40
+
+
 def test_lock_roundtrip(tmp_path: Path) -> None:
     lock = Lock(
         image_url="https://example.invalid/image.qcow2",

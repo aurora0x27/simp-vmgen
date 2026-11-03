@@ -31,7 +31,7 @@ stops and a commit message is provided.
 
 ## M4 - Kernel experiments
 
-- [ ] M4.1 Kernel source cache, fetch and checksum verification
+- [x] M4.1 Kernel source cache, fetch and checksum verification
 - [ ] M4.2 Kconfig handling (`defconfig` + fragments)
 - [ ] M4.3 Kernel build (`bzImage`, `vmlinux`, modules)
 - [ ] M4.4 Busybox rootfs plugin and initramfs generation

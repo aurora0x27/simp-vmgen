@@ -223,7 +223,7 @@ release = "24.04"
 [kernel]
 enabled = true
 """,
-            "version or source",
+            "version or commit",
         ),
         (
             """

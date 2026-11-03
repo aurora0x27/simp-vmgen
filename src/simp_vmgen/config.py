@@ -19,14 +19,22 @@ CONFIG_FILENAME = "vmgen.toml"
 LOCK_FILENAME = "vmgen.lock"
 DEFAULT_SSH_KEY = ".simp-vmgen/ssh/id_ed25519"
 DEFAULT_ROOT_PASSWORD = "114514"
+DEFAULT_KERNEL_REPO = (
+    "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"
+)
 
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _USER_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 _TAG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SIZE_RE = re.compile(r"^([1-9][0-9]*)([KMGT])?$", re.IGNORECASE)
+_CONFIG_OPTION_RE = re.compile(r"^CONFIG_[A-Za-z0-9_]+$")
+_KERNEL_VERSION_RE = re.compile(r"^\d+\.\d+(\.\d+)?$")
+_KERNEL_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 _VM_ACCELS = {"auto", "kvm", "tcg"}
 _VM_DISPLAYS = {"none", "gtk", "sdl", "vnc"}
+_KERNEL_MODES = {"build", "artifact"}
+_KERNEL_ARTIFACT_TYPES = {"bzImage", "vmlinuz", "vmlinux", "Image"}
 
 
 def _table(value: Any, where: str) -> dict[str, Any]:
@@ -95,6 +103,30 @@ def _string_list(table: dict[str, Any], key: str, where: str) -> list[str]:
         if not isinstance(item, str) or not item.strip():
             raise ConfigError(f"{where}.{key}[{index}]: expected a non-empty string")
         result.append(item)
+    return result
+
+
+def _config_options(
+    table: dict[str, Any], key: str, where: str
+) -> dict[str, str]:
+    value = table.get(key, {})
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where}.{key}: expected a table")
+    result: dict[str, str] = {}
+    for name, raw in value.items():
+        if not isinstance(name, str) or _CONFIG_OPTION_RE.match(name) is None:
+            raise ConfigError(f"{where}.{key}: invalid Kconfig option {name!r}")
+        if isinstance(raw, bool):
+            option_value = "y" if raw else "n"
+        elif isinstance(raw, int):
+            option_value = str(raw)
+        elif isinstance(raw, str):
+            option_value = raw
+        else:
+            raise ConfigError(
+                f"{where}.{key}.{name}: expected a string, integer or boolean"
+            )
+        result[name] = option_value
     return result
 
 
@@ -227,14 +259,22 @@ class ProvisionConfig:
 @dataclass(slots=True)
 class KernelConfig:
     enabled: bool = False
+    mode: str = "build"
     version: str = ""
-    source: str = ""
+    commit: str = ""
+    repo: str = DEFAULT_KERNEL_REPO
+    source_url: str = ""
     source_checksum: str = ""
     config: str = "defconfig"
-    fragment: str = ""
+    fragments: list[str] = field(default_factory=list)
+    options: dict[str, str] = field(default_factory=dict)
+    targets: list[str] = field(default_factory=lambda: ["bzImage"])
+    make_args: list[str] = field(default_factory=list)
     jobs: int = 0
     rootfs: str = "busybox"
-    rootfs_image: str = ""
+    artifact: str = ""
+    artifact_type: str = "bzImage"
+    initrd: str = ""
     append: str = ""
 
 
@@ -395,28 +435,61 @@ class Config:
             kernel_table,
             {
                 "enabled",
+                "mode",
                 "version",
-                "source",
+                "commit",
+                "repo",
+                "source_url",
                 "source_checksum",
                 "config",
-                "fragment",
+                "fragments",
+                "options",
+                "targets",
+                "make_args",
                 "jobs",
                 "rootfs",
-                "rootfs_image",
+                "artifact",
+                "artifact_type",
+                "initrd",
                 "append",
             },
             f"{source}.kernel",
         )
         kernel = KernelConfig(
             enabled=_bool(kernel_table, "enabled", f"{source}.kernel"),
+            mode=_string(kernel_table, "mode", f"{source}.kernel", default="build"),
             version=_string(kernel_table, "version", f"{source}.kernel"),
-            source=_string(kernel_table, "source", f"{source}.kernel"),
-            source_checksum=_string(kernel_table, "source_checksum", f"{source}.kernel"),
-            config=_string(kernel_table, "config", f"{source}.kernel", default="defconfig"),
-            fragment=_string(kernel_table, "fragment", f"{source}.kernel"),
+            commit=_string(kernel_table, "commit", f"{source}.kernel"),
+            repo=_string(
+                kernel_table,
+                "repo",
+                f"{source}.kernel",
+                default=DEFAULT_KERNEL_REPO,
+            ),
+            source_url=_string(kernel_table, "source_url", f"{source}.kernel"),
+            source_checksum=_string(
+                kernel_table, "source_checksum", f"{source}.kernel"
+            ),
+            config=_string(
+                kernel_table, "config", f"{source}.kernel", default="defconfig"
+            ),
+            fragments=_string_list(kernel_table, "fragments", f"{source}.kernel"),
+            options=_config_options(kernel_table, "options", f"{source}.kernel"),
+            targets=_string_list(kernel_table, "targets", f"{source}.kernel")
+            or ["bzImage"],
+            make_args=_string_list(kernel_table, "make_args", f"{source}.kernel"),
             jobs=_int(kernel_table, "jobs", f"{source}.kernel", default=0, minimum=0),
-            rootfs=_string(kernel_table, "rootfs", f"{source}.kernel", default="busybox"),
-            rootfs_image=_string(kernel_table, "rootfs_image", f"{source}.kernel"),
+            rootfs=_string(
+                kernel_table, "rootfs", f"{source}.kernel", default="busybox"
+            ),
+            artifact=_string(kernel_table, "artifact", f"{source}.kernel"),
+            artifact_type=_string(
+                kernel_table,
+                "artifact_type",
+                f"{source}.kernel",
+                default="bzImage",
+            ),
+            initrd=_string(kernel_table, "initrd", f"{source}.kernel"),
             append=_string(kernel_table, "append", f"{source}.kernel"),
         )
 
@@ -528,10 +601,78 @@ class Config:
             raise ConfigError(f"{source}.gdb.port: must differ from ssh.port when both are fixed")
 
         if self.kernel.enabled:
-            if not self.kernel.version and not self.kernel.source:
-                raise ConfigError(f"{source}.kernel: version or source is required when enabled")
-            if not self.kernel.rootfs.strip():
-                raise ConfigError(f"{source}.kernel.rootfs: must not be empty")
+            kernel = self.kernel
+            normalized_options: dict[str, str] = {}
+            for name, raw in kernel.options.items():
+                if _CONFIG_OPTION_RE.match(name) is None:
+                    raise ConfigError(
+                        f"{source}.kernel.options: invalid Kconfig option {name!r}"
+                    )
+                if isinstance(raw, bool):
+                    normalized_options[name] = "y" if raw else "n"
+                elif isinstance(raw, int):
+                    normalized_options[name] = str(raw)
+                elif isinstance(raw, str):
+                    normalized_options[name] = raw
+                else:
+                    raise ConfigError(
+                        f"{source}.kernel.options.{name}: invalid value {raw!r}"
+                    )
+            kernel.options = normalized_options
+            if kernel.mode not in _KERNEL_MODES:
+                raise ConfigError(
+                    f"{source}.kernel.mode: expected one of "
+                    f"{', '.join(sorted(_KERNEL_MODES))}"
+                )
+            if kernel.artifact:
+                kernel.mode = "artifact"
+            if kernel.mode == "artifact":
+                if not kernel.artifact:
+                    raise ConfigError(
+                        f"{source}.kernel.artifact: required in artifact mode"
+                    )
+                if kernel.version or kernel.commit:
+                    raise ConfigError(
+                        f"{source}.kernel: artifact mode cannot use version or commit"
+                    )
+                if kernel.artifact_type not in _KERNEL_ARTIFACT_TYPES:
+                    raise ConfigError(
+                        f"{source}.kernel.artifact_type: expected one of "
+                        f"{', '.join(sorted(_KERNEL_ARTIFACT_TYPES))}"
+                    )
+            else:
+                if kernel.version and kernel.commit:
+                    raise ConfigError(
+                        f"{source}.kernel: version and commit are mutually exclusive"
+                    )
+                if not kernel.version and not kernel.commit:
+                    raise ConfigError(
+                        f"{source}.kernel: version or commit is required in build mode"
+                    )
+                if kernel.version and _KERNEL_VERSION_RE.match(kernel.version) is None:
+                    raise ConfigError(
+                        f"{source}.kernel.version: invalid version {kernel.version!r}"
+                    )
+                if kernel.commit and _KERNEL_COMMIT_RE.match(kernel.commit) is None:
+                    raise ConfigError(
+                        f"{source}.kernel.commit: expected a 7-40 character hex commit"
+                    )
+                if kernel.commit and not kernel.repo:
+                    raise ConfigError(f"{source}.kernel.repo: must not be empty")
+                if kernel.source_url and not kernel.source_url.startswith(
+                    ("http://", "https://")
+                ):
+                    raise ConfigError(
+                        f"{source}.kernel.source_url: expected an http(s) URL"
+                    )
+                if not kernel.config.strip():
+                    raise ConfigError(f"{source}.kernel.config: must not be empty")
+                if not kernel.targets:
+                    raise ConfigError(f"{source}.kernel.targets: at least one target is required")
+            if kernel.rootfs not in ("busybox", "none"):
+                raise ConfigError(
+                    f"{source}.kernel.rootfs: expected 'busybox' or 'none'"
+                )
 
     def get_user(self, name: str) -> UserConfig:
         for user in self.users:
@@ -640,21 +781,38 @@ class Config:
 
         kernel: dict[str, Any] = {
             "enabled": self.kernel.enabled,
+            "mode": self.kernel.mode,
             "config": self.kernel.config,
             "rootfs": self.kernel.rootfs,
         }
-        if self.kernel.version:
-            kernel["version"] = self.kernel.version
-        if self.kernel.source:
-            kernel["source"] = self.kernel.source
-        if self.kernel.source_checksum:
-            kernel["source_checksum"] = self.kernel.source_checksum
-        if self.kernel.fragment:
-            kernel["fragment"] = self.kernel.fragment
-        if self.kernel.jobs:
-            kernel["jobs"] = self.kernel.jobs
-        if self.kernel.rootfs_image:
-            kernel["rootfs_image"] = self.kernel.rootfs_image
+        if self.kernel.mode == "artifact":
+            if self.kernel.artifact:
+                kernel["artifact"] = self.kernel.artifact
+            if self.kernel.artifact_type != "bzImage":
+                kernel["artifact_type"] = self.kernel.artifact_type
+        else:
+            if self.kernel.version:
+                kernel["version"] = self.kernel.version
+            if self.kernel.commit:
+                kernel["commit"] = self.kernel.commit
+            if self.kernel.repo != DEFAULT_KERNEL_REPO:
+                kernel["repo"] = self.kernel.repo
+            if self.kernel.source_url:
+                kernel["source_url"] = self.kernel.source_url
+            if self.kernel.source_checksum:
+                kernel["source_checksum"] = self.kernel.source_checksum
+            if self.kernel.fragments:
+                kernel["fragments"] = list(self.kernel.fragments)
+            if self.kernel.options:
+                kernel["options"] = dict(self.kernel.options)
+            if self.kernel.targets != ["bzImage"]:
+                kernel["targets"] = list(self.kernel.targets)
+            if self.kernel.make_args:
+                kernel["make_args"] = list(self.kernel.make_args)
+            if self.kernel.jobs:
+                kernel["jobs"] = self.kernel.jobs
+        if self.kernel.initrd:
+            kernel["initrd"] = self.kernel.initrd
         if self.kernel.append:
             kernel["append"] = self.kernel.append
 

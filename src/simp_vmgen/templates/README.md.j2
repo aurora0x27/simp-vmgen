@@ -22,7 +22,7 @@ you pass `--force`.
 - Accelerator: `{{ config.vm.accel }}`
 - SSH: `{{ config.ssh.host }}:{{ config.ssh.port if config.ssh.port != "auto" else "<auto>" }}`{% if config.ssh.port == "auto" %} (port allocated at build time){% endif %}
 {% if config.kernel.enabled %}
-- Kernel: `{{ config.kernel.version or config.kernel.source }}` with `{{ config.kernel.rootfs }}` rootfs
+- Kernel: `{{ config.kernel.version or config.kernel.commit or config.kernel.artifact }}` with `{{ config.kernel.rootfs }}` rootfs
 {% endif %}
 
 ## Users

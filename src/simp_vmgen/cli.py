@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from . import __version__
 from .diagnose import diagnose
 from .errors import SimpVmgenError
+from .kernel import kernel_dispatch
 from .project import new_project, regen_project, show_project
 from .runtime import build as runtime_build
 from .runtime import clean as runtime_clean
@@ -281,9 +282,12 @@ def _add_kernel(subparsers: argparse._SubParsersAction) -> None:
         ("config", "generate the kernel configuration"),
         ("build", "build bzImage, vmlinux and modules"),
         ("initramfs", "build the busybox initramfs"),
+        ("status", "show kernel source and artifact status"),
         ("clean", "remove kernel build artifacts"),
     ):
-        kernel_sub.add_parser(name, help=help_text)
+        kernel_parser = kernel_sub.add_parser(name, help=help_text)
+        if name in ("fetch", "config", "build", "initramfs"):
+            _add_local_dry_run(kernel_parser)
 
 
 def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
@@ -328,7 +332,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "log": runtime_log,
         "guest": runtime_guest,
         "clean": runtime_clean,
-        "kernel": _not_implemented,
+        "kernel": kernel_dispatch,
         "gdb": _not_implemented,
     }
 

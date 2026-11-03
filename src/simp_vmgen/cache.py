@@ -28,6 +28,10 @@ def images_dir() -> Path:
     return cache_dir() / "images"
 
 
+def kernel_sources_dir() -> Path:
+    return cache_dir() / "kernel" / "sources"
+
+
 @contextmanager
 def _file_lock(path: Path) -> Iterator[TextIO]:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -145,12 +149,13 @@ def download(
     checksum: str = "",
     checksum_url: str = "",
     allow_unverified: bool = False,
+    directory: Path | None = None,
 ) -> tuple[Path, str]:
     """Return the cached image path and the checksum used for verification."""
     filename = Path(filename).name
     if not filename:
         raise CacheError(f"cannot determine a filename for {url!r}")
-    target = images_dir() / filename
+    target = (directory or images_dir()) / filename
     target.parent.mkdir(parents=True, exist_ok=True)
     lock_path = target.with_name(f"{target.name}.lock")
 

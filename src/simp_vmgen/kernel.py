@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +28,122 @@ def _load_lock(root: Path, config: Config) -> Lock:
         return Lock.load(path)
     distro = load_distro(config.distro.name)
     return create_lock(config, distro, distro.release(config.distro.release))
+
+
+def kernel_build_dir(layout: ProjectLayout) -> Path:
+    return layout.kernel_dir / "build"
+
+
+def _run_make(
+    source: Path,
+    build: Path,
+    config: Config,
+    target: str,
+    *,
+    dry_run: bool = False,
+) -> None:
+    make = shutil.which("make")
+    if make is None:
+        raise ProjectError("make not found")
+    jobs = config.kernel.jobs or (os.cpu_count() or 1)
+    argv = [
+        make,
+        "-C",
+        str(source),
+        f"O={build}",
+        *config.kernel.make_args,
+    ]
+    if target in ("bzImage", "vmlinux", "modules", "all"):
+        argv.append(f"-j{jobs}")
+    argv.append(target)
+    if dry_run:
+        print("+", " ".join(argv))
+        return
+    try:
+        result = subprocess.run(
+            argv, capture_output=True, text=True, check=False, timeout=None
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProjectError(f"make {target} failed: {exc}") from exc
+    if result.returncode != 0:
+        output = (result.stderr or result.stdout).strip().splitlines()
+        detail = "\n".join(output[-30:])
+        raise ProjectError(f"make {target} failed:\n{detail}")
+
+
+def _kernel_config_file(config: Config, root: Path) -> tuple[Path | None, str]:
+    value = config.kernel.config
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = root / path
+    if path.is_file():
+        return path, ""
+    if "/" in value or value.endswith(".config"):
+        raise ProjectError(f"kernel config file not found: {path}")
+    if value == "menuconfig":
+        raise ProjectError(
+            "interactive menuconfig is not supported; use a defconfig plus fragments"
+        )
+    return None, value
+
+
+def configure_kernel(
+    config: Config,
+    root: Path,
+    source: Path,
+    layout: ProjectLayout,
+    *,
+    dry_run: bool = False,
+) -> Path:
+    build = kernel_build_dir(layout)
+    build.mkdir(parents=True, exist_ok=True)
+    config_file = build / ".config"
+    base_path, target = _kernel_config_file(config, root)
+    if dry_run:
+        if base_path is not None:
+            print(f"+ cp {base_path} {config_file}")
+        else:
+            _run_make(source, build, config, target, dry_run=True)
+        _run_make(source, build, config, "olddefconfig", dry_run=True)
+        return config_file
+
+    if base_path is not None:
+        shutil.copyfile(base_path, config_file)
+    else:
+        _run_make(source, build, config, target)
+
+    with config_file.open("a", encoding="utf-8") as handle:
+        handle.write("\n# simp-vmgen fragments\n")
+        for fragment in config.kernel.fragments:
+            path = Path(fragment).expanduser()
+            if not path.is_absolute():
+                path = root / path
+            try:
+                handle.write(path.read_text(encoding="utf-8").rstrip() + "\n")
+            except OSError as exc:
+                raise ProjectError(f"cannot read Kconfig fragment {path}: {exc}") from exc
+        for name, value in sorted(config.kernel.options.items()):
+            handle.write(f"{name}={value}\n")
+
+    _run_make(source, build, config, "olddefconfig")
+    return config_file
+
+
+def kernel_config(args: Any) -> int:
+    root, config, layout = _project(args)
+    if not config.kernel.enabled:
+        raise ProjectError("kernel support is not enabled in vmgen.toml")
+    if config.kernel.mode == "artifact":
+        raise ProjectError("kernel config is not available in artifact mode")
+    info = resolve_source(config, root, layout, dry_run=getattr(args, "dry_run", False))
+    path = configure_kernel(
+        config, root, info.path, layout, dry_run=getattr(args, "dry_run", False)
+    )
+    if getattr(args, "dry_run", False):
+        print(f"would generate kernel config: {path}")
+    else:
+        print(f"kernel config: {path}")
+    return 0
 
 
 def kernel_fetch(args: Any) -> int:
@@ -57,4 +176,6 @@ def kernel_dispatch(args: Any) -> int:
     command = getattr(args, "kernel_command", None)
     if command == "fetch":
         return kernel_fetch(args)
+    if command == "config":
+        return kernel_config(args)
     raise ProjectError(f"kernel {command or ''} is not implemented yet")

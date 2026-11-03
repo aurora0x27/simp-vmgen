@@ -32,7 +32,7 @@ stops and a commit message is provided.
 ## M4 - Kernel experiments
 
 - [x] M4.1 Kernel source cache, fetch and checksum verification
-- [ ] M4.2 Kconfig handling (`defconfig` + fragments)
+- [x] M4.2 Kconfig handling (`defconfig` + fragments)
 - [ ] M4.3 Kernel build (`bzImage`, `vmlinux`, modules)
 - [ ] M4.4 Busybox rootfs plugin and initramfs generation
 - [ ] M4.5 Kernel boot arguments, GDB stub and `sim-vmgen kernel` commands

@@ -860,7 +860,7 @@ class Config:
 
 
 def _dump_named_table(name: str, data: dict[str, Any]) -> str:
-    return f"[{name}]\n{tomli_w.dumps(data)}"
+    return tomli_w.dumps({name: data})
 
 
 def _dump_array_table(name: str, data: dict[str, Any]) -> str:

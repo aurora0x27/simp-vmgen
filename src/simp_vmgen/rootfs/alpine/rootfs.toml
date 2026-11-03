@@ -9,8 +9,13 @@ source_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine
 source_filename = "alpine-minirootfs-3.22.0-x86_64.tar.gz"
 source_checksum_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-minirootfs-3.22.0-x86_64.tar.gz.sha256"
 packages = [
+    "openrc",
+    "ifupdown-ng",
     "openssh",
     "sudo",
     "fish",
     "tzdata",
 ]
+apk_tools_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/apk-tools-static-2.14.12-r0.apk"
+apk_tools_filename = "apk-tools-static-2.14.12-r0.apk"
+apk_tools_checksum = "sha256:f44523ae4ded143b3d85e16be4bf7ff386fc052406c3b22f87f045efb0aa4305"

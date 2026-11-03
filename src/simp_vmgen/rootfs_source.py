@@ -7,9 +7,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .cache import download, rootfs_sources_dir
+from .cache import download, resolve_checksum, rootfs_sources_dir
 from .config import LOCK_FILENAME, Config
-from .errors import ProjectError
+from .errors import CacheError, ProjectError
 from .layout import ProjectLayout
 from .lock import Lock, RootfsLock
 from .rootfs import RootfsSpec, load_rootfs
@@ -91,6 +91,16 @@ def fetch_rootfs(
     else:
         archive = rootfs_sources_dir() / spec.source_name()
         checksum = spec.source_checksum
+        lock_path = root / LOCK_FILENAME
+        if not checksum and lock_path.is_file():
+            lock = Lock.load(lock_path)
+            if lock.rootfs.source == spec.name:
+                checksum = lock.rootfs.checksum
+        if not checksum and spec.source_checksum_url:
+            try:
+                checksum = resolve_checksum(spec.source_checksum_url, spec.source_name())
+            except CacheError:
+                checksum = ""
     return RootfsSourceInfo(
         spec=spec,
         archive=archive,

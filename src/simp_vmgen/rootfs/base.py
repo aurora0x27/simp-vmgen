@@ -39,6 +39,9 @@ class RootfsSpec:
     source_checksum_url: str = ""
     packages: tuple[str, ...] = ()
     boot_args: str = ""
+    apk_tools_url: str = ""
+    apk_tools_filename: str = ""
+    apk_tools_checksum: str = ""
 
     def source_name(self) -> str:
         return self.source_filename or Path(urlparse(self.source_url).path).name
@@ -63,6 +66,9 @@ def _parse(text: str, *, source: str) -> RootfsSpec:
         "source_checksum_url",
         "packages",
         "boot_args",
+        "apk_tools_url",
+        "apk_tools_filename",
+        "apk_tools_checksum",
     }
     unknown = sorted(set(data) - allowed)
     if unknown:
@@ -99,6 +105,9 @@ def _parse(text: str, *, source: str) -> RootfsSpec:
         source_checksum_url=_string(data, "source_checksum_url", source),
         packages=tuple(packages),
         boot_args=_string(data, "boot_args", source),
+        apk_tools_url=_string(data, "apk_tools_url", source),
+        apk_tools_filename=_string(data, "apk_tools_filename", source),
+        apk_tools_checksum=_string(data, "apk_tools_checksum", source),
     )
 
 

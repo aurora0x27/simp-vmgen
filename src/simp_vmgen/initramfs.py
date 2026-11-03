@@ -132,8 +132,7 @@ def build_initramfs(
     spec = load_rootfs(config.kernel.rootfs)
     if spec.name != "busybox":
         raise ProjectError(
-            f"rootfs plugin {spec.name!r} is not implemented yet "
-            "(only busybox is available)"
+            f"rootfs plugin {spec.name!r} is not implemented yet (only busybox is available)"
         )
     rootfs = layout.kernel_dir / "initramfs"
     output = layout.kernel_dir / "initramfs.cpio.gz"

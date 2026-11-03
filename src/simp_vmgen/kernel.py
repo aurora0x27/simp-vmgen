@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .alpine import prepare_alpine_rootfs
 from .config import LOCK_FILENAME, Config
 from .distros import load_distro
 from .errors import ProjectError
@@ -17,8 +18,10 @@ from .kernel_source import apply_to_lock, artifact_path, resolve_source
 from .layout import ProjectLayout
 from .lock import Lock, create_lock
 from .paths import load_project
+from .rootfs import load_rootfs
 from .rootfs_source import fetch_rootfs
 from .rootfs_source import update_lock as update_rootfs_lock
+from .sshkeys import ensure_ssh_key
 
 
 def _project(args: Any) -> tuple[Path, Config, ProjectLayout]:
@@ -333,14 +336,27 @@ def kernel_rootfs(args: Any) -> int:
     root, config, layout = _project(args)
     if not config.kernel.enabled:
         raise ProjectError("kernel support is not enabled in vmgen.toml")
-    info = fetch_rootfs(
-        config,
-        root,
-        layout,
-        force=getattr(args, "force", False),
-        dry_run=getattr(args, "dry_run", False),
-    )
-    if getattr(args, "dry_run", False):
+    spec = load_rootfs(config.kernel.rootfs)
+    dry_run = getattr(args, "dry_run", False)
+    if spec.name == "alpine":
+        key = None if dry_run else ensure_ssh_key(config, layout.ssh_key)
+        info = prepare_alpine_rootfs(
+            config,
+            root,
+            layout,
+            generated_public_key=key.public_key if key is not None else "",
+            force=getattr(args, "force", False),
+            dry_run=dry_run,
+        )
+    else:
+        info = fetch_rootfs(
+            config,
+            root,
+            layout,
+            force=getattr(args, "force", False),
+            dry_run=dry_run,
+        )
+    if dry_run:
         print(f"would prepare rootfs: {info.root_dir}")
         return 0
     update_rootfs_lock(root, info)

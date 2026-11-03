@@ -20,17 +20,14 @@ from .errors import ProjectError
 from .layout import ProjectLayout
 from .mounts import resolve_mounts
 from .paths import load_project
+from .rootfs import RootfsSpec, load_rootfs
 from .seed import READY_MARKER
-
-BUSYBOX_URL = "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
-BUSYBOX_SHA256 = "sha256:6e123e7f3202a8c1e9b1f94d8941580a25135382b99e8d3e34fb858bba311348"
-BUSYBOX_FILENAME = "busybox-1.35.0-x86_64-linux-musl"
 
 
 @lru_cache(maxsize=1)
 def _environment() -> Environment:
     env = Environment(
-        loader=PackageLoader("simp_vmgen", "templates"),
+        loader=PackageLoader("simp_vmgen", "rootfs"),
         autoescape=False,
         keep_trailing_newline=True,
         trim_blocks=True,
@@ -49,11 +46,14 @@ def _write(path: Path, content: str, *, mode: int = 0o644) -> None:
     os.replace(tmp, path)
 
 
-def ensure_busybox() -> Path:
+def ensure_busybox(spec: RootfsSpec) -> Path:
+    if not spec.source_url:
+        raise ProjectError("busybox rootfs source_url is missing")
     path, _checksum = download(
-        BUSYBOX_URL,
-        BUSYBOX_FILENAME,
-        checksum=BUSYBOX_SHA256,
+        spec.source_url,
+        spec.source_name(),
+        checksum=spec.source_checksum,
+        checksum_url=spec.source_checksum_url,
         directory=cache_dir() / "busybox",
     )
     os.chmod(path, 0o755)
@@ -129,6 +129,12 @@ def build_initramfs(
 ) -> Path:
     if config.kernel.rootfs == "none":
         raise ProjectError("kernel.rootfs is 'none'; provide kernel.initrd instead")
+    spec = load_rootfs(config.kernel.rootfs)
+    if spec.name != "busybox":
+        raise ProjectError(
+            f"rootfs plugin {spec.name!r} is not implemented yet "
+            "(only busybox is available)"
+        )
     rootfs = layout.kernel_dir / "initramfs"
     output = layout.kernel_dir / "initramfs.cpio.gz"
     if dry_run:
@@ -143,7 +149,7 @@ def build_initramfs(
     if modules.is_dir():
         shutil.copytree(modules, rootfs / "lib", dirs_exist_ok=True)
 
-    busybox = busybox_path or ensure_busybox()
+    busybox = busybox_path or ensure_busybox(spec)
     shutil.copy2(busybox, rootfs / "bin" / "busybox")
     os.chmod(rootfs / "bin" / "busybox", 0o755)
     if install_applets:
@@ -152,7 +158,7 @@ def build_initramfs(
     mounts = resolve_mounts(config, layout.root)
     init = (
         _environment()
-        .get_template("initramfs/init.j2")
+        .get_template(f"{spec.name}/{spec.templates}/init.j2")
         .render(
             config=config,
             tool_version=__version__,

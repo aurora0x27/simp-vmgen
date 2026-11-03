@@ -646,8 +646,8 @@ class Config:
                     raise ConfigError(f"{source}.kernel.config: must not be empty")
                 if not kernel.targets:
                     raise ConfigError(f"{source}.kernel.targets: at least one target is required")
-            if kernel.rootfs not in ("busybox", "none"):
-                raise ConfigError(f"{source}.kernel.rootfs: expected 'busybox' or 'none'")
+            if not kernel.rootfs.strip():
+                raise ConfigError(f"{source}.kernel.rootfs: must not be empty")
 
     def get_user(self, name: str) -> UserConfig:
         for user in self.users:

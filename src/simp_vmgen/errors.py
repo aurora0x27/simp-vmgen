@@ -9,3 +9,7 @@ class SimpVmgenError(Exception):
 
 class ConfigError(SimpVmgenError):
     """Invalid or unreadable project configuration."""
+
+
+class DistroError(SimpVmgenError):
+    """Unknown distro or invalid distro metadata."""

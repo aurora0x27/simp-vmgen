@@ -1,0 +1,69 @@
+name = "ubuntu"
+display_name = "Ubuntu"
+architectures = ["x86_64"]
+default_release = "24.04"
+provisioner = "cloud-init"
+init_system = "systemd"
+package_manager = "apt"
+default_shell = "fish"
+ssh_service = "ssh"
+templates = "templates"
+
+[package_sets]
+base = [
+    "ca-certificates",
+    "curl",
+    "file",
+    "fish",
+    "git",
+    "iproute2",
+    "kmod",
+    "less",
+    "procps",
+    "python3",
+    "util-linux",
+    "vim",
+]
+dev = [
+    "binutils",
+    "build-essential",
+    "clang",
+    "elfutils",
+    "gcc",
+    "gdb",
+    "jq",
+    "libelf-dev",
+    "ltrace",
+    "make",
+    "man-db",
+    "pkg-config",
+    "strace",
+    "tree",
+]
+kernel = [
+    "bc",
+    "bison",
+    "build-essential",
+    "cpio",
+    "dwarves",
+    "flex",
+    "git",
+    "kmod",
+    "libelf-dev",
+    "libssl-dev",
+    "perl",
+    "python3",
+    "rsync",
+    "xz-utils",
+    "zstd",
+]
+
+[[release]]
+version = "24.04"
+image_url = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-{arch}.img"
+image_checksum_url = "https://cloud-images.ubuntu.com/noble/current/SHA256SUMS"
+image_format = "qcow2"
+default_mem = "4G"
+default_cpus = 4
+default_disk = "30G"
+machine = "q35"

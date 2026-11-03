@@ -1,0 +1,66 @@
+name = "alpine"
+display_name = "Alpine Linux"
+architectures = ["x86_64"]
+default_release = "3.22"
+provisioner = "cloud-init"
+init_system = "openrc"
+package_manager = "apk"
+default_shell = "sh"
+ssh_service = "sshd"
+templates = "templates"
+
+[package_sets]
+base = [
+    "bash",
+    "ca-certificates",
+    "curl",
+    "file",
+    "git",
+    "iproute2",
+    "less",
+    "procps",
+    "python3",
+    "util-linux",
+    "vim",
+]
+dev = [
+    "binutils",
+    "build-base",
+    "elfutils-dev",
+    "gdb",
+    "jq",
+    "linux-headers",
+    "ltrace",
+    "make",
+    "mandoc",
+    "pkgconf",
+    "strace",
+    "tree",
+]
+kernel = [
+    "bc",
+    "bison",
+    "build-base",
+    "cpio",
+    "elfutils-dev",
+    "flex",
+    "linux-headers",
+    "musl-dev",
+    "ncurses-dev",
+    "openssl-dev",
+    "perl",
+    "python3",
+    "rsync",
+    "xz",
+    "zstd",
+]
+
+[[release]]
+version = "3.22"
+image_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.0-{arch}-bios-cloudinit-r0.qcow2"
+image_checksum_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.0-{arch}-bios-cloudinit-r0.qcow2.sha512"
+image_format = "qcow2"
+default_mem = "2G"
+default_cpus = 2
+default_disk = "10G"
+machine = "pc"

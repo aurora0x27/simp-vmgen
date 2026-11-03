@@ -119,6 +119,16 @@ readonly = true
 Relative sources are resolved from the project root. Each mount becomes a 9p
 share (`host0`, `host1`, ...) and is mounted in the guest by cloud-init.
 
+## Inspecting a project
+
+```sh
+simp-vmgen -C lab show
+simp-vmgen -C lab show --json
+```
+
+`show` prints the resolved configuration, lock information and runtime paths.
+`--json` is intended for scripts.
+
 ## Diagnostics
 
 ```sh

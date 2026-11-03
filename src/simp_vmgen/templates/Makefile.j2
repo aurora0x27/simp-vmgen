@@ -3,7 +3,7 @@
 SIMP_VMGEN ?= simp-vmgen
 .DEFAULT_GOAL := help
 
-.PHONY: help build regen diagnose run run-fg snapshot stop status wait log \
+.PHONY: help build regen regen-check show diagnose run run-fg snapshot stop status wait log \
         tty ssh serial console guest lab kernel-fetch kernel-config \
         kernel-build kernel-initramfs clean distclean
 
@@ -15,6 +15,12 @@ build:
 
 regen:
 	@$(SIMP_VMGEN) regen
+
+regen-check:
+	@$(SIMP_VMGEN) regen --check
+
+show:
+	@$(SIMP_VMGEN) show
 
 diagnose:
 	@$(SIMP_VMGEN) diagnose

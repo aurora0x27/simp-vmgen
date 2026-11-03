@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from .config import (
@@ -25,7 +27,8 @@ from .config import (
 )
 from .distros import load_distro
 from .errors import ProjectError
-from .lock import create_lock
+from .layout import ProjectLayout
+from .lock import Lock, create_lock
 from .manifest import GeneratedManifest
 from .paths import load_project
 from .render import render_project, write_rendered
@@ -174,9 +177,7 @@ def new_project(args: argparse.Namespace) -> int:
     if target.exists() and not target.is_dir():
         raise ProjectError(f"target exists and is not a directory: {target}")
     if target.exists() and any(target.iterdir()) and not args.force:
-        raise ProjectError(
-            f"target directory is not empty: {target} (use --force to overwrite)"
-        )
+        raise ProjectError(f"target directory is not empty: {target} (use --force to overwrite)")
 
     if args.interactive:
         if not sys.stdin.isatty():
@@ -273,11 +274,38 @@ def regen_project(args: argparse.Namespace) -> int:
         print(f"updated {root / item.path}")
     if conflicts and not args.force:
         for item in conflicts:
-            print(
-                f"conflict {root / item.path}: locally modified "
-                "(use --force to overwrite)"
-            )
+            print(f"conflict {root / item.path}: locally modified (use --force to overwrite)")
         return 1
     if not to_write and not conflicts:
         print(f"{root}: generated files are up to date")
+    return 0
+
+
+def show_project(args: argparse.Namespace) -> int:
+    root, config = load_project(args.directory)
+    layout = ProjectLayout(root, config)
+    lock_path = root / LOCK_FILENAME
+    lock = Lock.load(lock_path) if lock_path.is_file() else None
+
+    if getattr(args, "json", False):
+        data = {
+            "root": str(root),
+            "config_path": str(root / CONFIG_FILENAME),
+            "lock_path": str(lock_path),
+            "runtime_dir": str(layout.runtime_dir),
+            "config": asdict(config),
+            "lock": asdict(lock) if lock is not None else None,
+        }
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print(f"project : {root}")
+    print(f"config  : {root / CONFIG_FILENAME}")
+    print(f"lock    : {lock_path}")
+    print(f"runtime : {layout.runtime_dir}")
+    if lock is not None:
+        print(f"image   : {lock.image_url}")
+        print(f"checksum: {lock.image_checksum or '(resolved on build)'}")
+    print()
+    print(config.dumps().rstrip())
     return 0

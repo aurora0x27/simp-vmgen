@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from . import __version__
 from .diagnose import diagnose
 from .errors import SimpVmgenError
-from .project import new_project, regen_project
+from .project import new_project, regen_project, show_project
 from .runtime import build as runtime_build
 from .runtime import clean as runtime_clean
 from .runtime import console as runtime_console
@@ -88,9 +88,7 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
         description="Create a new lab project from the selected distro template.",
     )
     p.add_argument("directory", nargs="?", default=".", metavar="DIR")
-    p.add_argument(
-        "--name", dest="project_name", metavar="NAME", help="project/hostname name"
-    )
+    p.add_argument("--name", dest="project_name", metavar="NAME", help="project/hostname name")
     p.add_argument("-i", "--interactive", action="store_true", help="interactive wizard")
     p.add_argument("--distro", metavar="NAME", help="distro name (ubuntu, alpine)")
     p.add_argument("--release", metavar="VERSION", help="distro release")
@@ -317,7 +315,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "new": new_project,
         "regen": regen_project,
         "diagnose": diagnose,
-        "show": _not_implemented,
+        "show": show_project,
         "build": runtime_build,
         "run": runtime_run,
         "stop": runtime_stop,

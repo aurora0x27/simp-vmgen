@@ -27,7 +27,7 @@ stops and a commit message is provided.
 
 - [x] M3.1 `-i` wizard with defaults, sections, summary and cancel
 - [x] M3.2 `regen` conflict detection and `--force`
-- [ ] M3.3 Generated README, `.gitignore` and `show --json`
+- [x] M3.3 Generated README, `.gitignore` and `show --json`
 
 ## M4 - Kernel experiments
 

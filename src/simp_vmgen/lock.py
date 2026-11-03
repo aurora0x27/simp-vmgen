@@ -45,6 +45,15 @@ class KernelLock:
 
 
 @dataclass(slots=True)
+class RootfsLock:
+    source: str = ""
+    version: str = ""
+    kind: str = ""
+    url: str = ""
+    checksum: str = ""
+
+
+@dataclass(slots=True)
 class Lock:
     schema: int = LOCK_SCHEMA_VERSION
     image_url: str = ""
@@ -52,6 +61,7 @@ class Lock:
     image_checksum: str = ""
     image_checksum_url: str = ""
     kernel: KernelLock = field(default_factory=KernelLock)
+    rootfs: RootfsLock = field(default_factory=RootfsLock)
     tool_version: str = __version__
 
     @classmethod
@@ -68,7 +78,7 @@ class Lock:
             data = tomllib.loads(text)
         except tomllib.TOMLDecodeError as exc:
             raise LockError(f"{source}: invalid TOML: {exc}") from exc
-        unknown = sorted(set(data) - {"schema", "image", "kernel", "tool"})
+        unknown = sorted(set(data) - {"schema", "image", "kernel", "rootfs", "tool"})
         if unknown:
             raise LockError(f"{source}: unknown key(s): {', '.join(unknown)}")
         schema = data.get("schema", LOCK_SCHEMA_VERSION)
@@ -97,6 +107,11 @@ class Lock:
         unknown = sorted(set(kernel) - kernel_keys)
         if unknown:
             raise LockError(f"{source}.kernel: unknown key(s): {', '.join(unknown)}")
+        rootfs = _table(data.get("rootfs", {}), f"{source}.rootfs")
+        rootfs_keys = {"source", "version", "kind", "url", "checksum"}
+        unknown = sorted(set(rootfs) - rootfs_keys)
+        if unknown:
+            raise LockError(f"{source}.rootfs: unknown key(s): {', '.join(unknown)}")
         tool = _table(data.get("tool", {}), f"{source}.tool")
         unknown = sorted(set(tool) - {"version"})
         if unknown:
@@ -116,6 +131,13 @@ class Lock:
                 commit=_string(kernel, "commit", f"{source}.kernel"),
                 artifact=_string(kernel, "artifact", f"{source}.kernel"),
                 artifact_checksum=_string(kernel, "artifact_checksum", f"{source}.kernel"),
+            ),
+            rootfs=RootfsLock(
+                source=_string(rootfs, "source", f"{source}.rootfs"),
+                version=_string(rootfs, "version", f"{source}.rootfs"),
+                kind=_string(rootfs, "kind", f"{source}.rootfs"),
+                url=_string(rootfs, "url", f"{source}.rootfs"),
+                checksum=_string(rootfs, "checksum", f"{source}.rootfs"),
             ),
             tool_version=_string(tool, "version", f"{source}.tool", __version__),
         )
@@ -138,6 +160,13 @@ class Lock:
                 "commit": self.kernel.commit,
                 "artifact": self.kernel.artifact,
                 "artifact_checksum": self.kernel.artifact_checksum,
+            },
+            "rootfs": {
+                "source": self.rootfs.source,
+                "version": self.rootfs.version,
+                "kind": self.rootfs.kind,
+                "url": self.rootfs.url,
+                "checksum": self.rootfs.checksum,
             },
             "tool": {"version": self.tool_version},
         }

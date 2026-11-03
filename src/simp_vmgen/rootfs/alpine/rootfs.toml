@@ -1,0 +1,16 @@
+name = "alpine"
+display_name = "Alpine minirootfs"
+kind = "initramfs"
+distro = "alpine"
+release = "3.22"
+templates = "templates"
+init = "/init"
+source_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-minirootfs-3.22.0-x86_64.tar.gz"
+source_filename = "alpine-minirootfs-3.22.0-x86_64.tar.gz"
+source_checksum_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/alpine-minirootfs-3.22.0-x86_64.tar.gz.sha256"
+packages = [
+    "openssh",
+    "sudo",
+    "fish",
+    "tzdata",
+]

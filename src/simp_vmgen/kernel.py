@@ -17,6 +17,8 @@ from .kernel_source import apply_to_lock, artifact_path, resolve_source
 from .layout import ProjectLayout
 from .lock import Lock, create_lock
 from .paths import load_project
+from .rootfs_source import fetch_rootfs
+from .rootfs_source import update_lock as update_rootfs_lock
 
 
 def _project(args: Any) -> tuple[Path, Config, ProjectLayout]:
@@ -327,6 +329,29 @@ def kernel_fetch(args: Any) -> int:
     return 0
 
 
+def kernel_rootfs(args: Any) -> int:
+    root, config, layout = _project(args)
+    if not config.kernel.enabled:
+        raise ProjectError("kernel support is not enabled in vmgen.toml")
+    info = fetch_rootfs(
+        config,
+        root,
+        layout,
+        force=getattr(args, "force", False),
+        dry_run=getattr(args, "dry_run", False),
+    )
+    if getattr(args, "dry_run", False):
+        print(f"would prepare rootfs: {info.root_dir}")
+        return 0
+    update_rootfs_lock(root, info)
+    print(f"rootfs : {info.spec.name} {info.spec.release} ({info.spec.kind})")
+    print(f"source : {info.root_dir}")
+    print(f"archive: {info.archive}")
+    if info.checksum:
+        print(f"sha256 : {info.checksum}")
+    return 0
+
+
 def kernel_status(args: Any) -> int:
     root, config, layout = _project(args)
     if not config.kernel.enabled:
@@ -372,6 +397,8 @@ def kernel_dispatch(args: Any) -> int:
         return kernel_build(args)
     if command == "initramfs":
         return kernel_initramfs(args)
+    if command == "rootfs":
+        return kernel_rootfs(args)
     if command == "status":
         return kernel_status(args)
     if command == "clean":

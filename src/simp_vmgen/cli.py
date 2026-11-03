@@ -324,13 +324,18 @@ def _add_kernel(subparsers: argparse._SubParsersAction) -> None:
         ("fetch", "download and verify the kernel source"),
         ("config", "generate the kernel configuration"),
         ("build", "build bzImage, vmlinux and modules"),
+        ("rootfs", "fetch and prepare the configured kernel rootfs"),
         ("initramfs", "build the busybox initramfs"),
         ("status", "show kernel source and artifact status"),
         ("clean", "remove kernel build artifacts"),
     ):
         kernel_parser = kernel_sub.add_parser(name, help=help_text)
-        if name in ("fetch", "config", "build", "initramfs"):
+        if name in ("fetch", "config", "build", "rootfs", "initramfs"):
             _add_local_dry_run(kernel_parser)
+        if name == "rootfs":
+            kernel_parser.add_argument(
+                "--force", action="store_true", help="re-extract the rootfs source"
+            )
 
 
 def _add_gdb(subparsers: argparse._SubParsersAction) -> None:

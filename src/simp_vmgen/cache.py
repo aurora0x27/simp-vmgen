@@ -32,6 +32,10 @@ def kernel_sources_dir() -> Path:
     return cache_dir() / "kernel" / "sources"
 
 
+def rootfs_sources_dir() -> Path:
+    return cache_dir() / "rootfs" / "sources"
+
+
 @contextmanager
 def _file_lock(path: Path) -> Iterator[TextIO]:
     path.parent.mkdir(parents=True, exist_ok=True)

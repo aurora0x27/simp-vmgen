@@ -63,17 +63,26 @@ def ensure_busybox() -> Path:
 def _install_applets(busybox: Path, rootfs: Path) -> None:
     try:
         result = subprocess.run(
-            [str(busybox), "--install", "-s", str(rootfs / "bin")],
+            [str(busybox), "--list"],
             capture_output=True,
             text=True,
             check=False,
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise ProjectError(f"cannot install busybox applets: {exc}") from exc
+        raise ProjectError(f"cannot list busybox applets: {exc}") from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
-        raise ProjectError(f"cannot install busybox applets: {detail}")
+        raise ProjectError(f"cannot list busybox applets: {detail}")
+    bin_dir = rootfs / "bin"
+    for applet in result.stdout.splitlines():
+        applet = applet.strip()
+        if not applet or applet == "busybox":
+            continue
+        target = bin_dir / applet
+        if target.exists() or target.is_symlink():
+            continue
+        target.symlink_to("busybox")
 
 
 def _archive(rootfs: Path, output: Path) -> None:

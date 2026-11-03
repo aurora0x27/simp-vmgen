@@ -18,6 +18,7 @@ from .cache import download, images_dir
 from .config import LOCK_FILENAME, Config
 from .distros import Distro, DistroRelease, load_distro
 from .errors import ProjectError
+from .kernel import ensure_kernel_artifacts, kernel_image_path, kernel_initrd_path
 from .layout import ProjectLayout
 from .lock import Lock, create_lock
 from .net import resolve_port
@@ -86,6 +87,19 @@ def build(args: Any) -> int:
     distro, release = _load_distro(config)
     layout = ProjectLayout(root, config)
     layout.ensure()
+
+    if config.kernel.enabled:
+        artifacts = ensure_kernel_artifacts(
+            config, root, layout, dry_run=getattr(args, "dry_run", False)
+        )
+        if getattr(args, "dry_run", False):
+            print(f"would use kernel image: {artifacts.image}")
+            print(f"would use initrd      : {artifacts.initrd}")
+        else:
+            print(f"kernel image : {artifacts.image}")
+            print(f"initrd       : {artifacts.initrd}")
+        print("build done")
+        return 0
 
     lock = _load_or_create_lock(root, config, distro, release)
     if getattr(args, "dry_run", False):
@@ -202,7 +216,10 @@ def run(args: Any) -> int:
 
     if running_pid(layout) is not None:
         raise ProjectError("the VM is already running; run `simp-vmgen stop` first")
-    if not layout.overlay.is_file() or not layout.seed_iso.is_file():
+    if config.kernel.enabled:
+        kernel_image_path(config, layout)
+        kernel_initrd_path(config, layout)
+    elif not layout.overlay.is_file() or not layout.seed_iso.is_file():
         raise ProjectError("VM artifacts are missing; run `simp-vmgen build` first")
 
     ssh_port = resolve_port(config.ssh.host, config.ssh.port, start=2222)

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .config import (
     CONFIG_FILENAME,
+    DEFAULT_KERNEL_REPO,
     DEFAULT_ROOT_PASSWORD,
     DEFAULT_SSH_KEY,
     LOCK_FILENAME,
@@ -120,6 +121,18 @@ def _parse_mounts(args: argparse.Namespace) -> list[MountConfig]:
     return mounts
 
 
+def _parse_kernel_options(values: list[str]) -> dict[str, str]:
+    options: dict[str, str] = {}
+    for value in values:
+        name, separator, option_value = value.partition("=")
+        if not separator or not name or not option_value:
+            raise ProjectError(
+                f"invalid --kernel-option {value!r}: expected CONFIG_X=Y"
+            )
+        options[name] = option_value
+    return options
+
+
 def config_from_args(args: argparse.Namespace, target: Path) -> Config:
     distro = load_distro(args.distro or "ubuntu")
     if args.arch not in distro.architectures:
@@ -129,8 +142,10 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
         )
     release = distro.release(args.release)
 
-    kernel_version = args.kernel_version
-    if args.kernel and not kernel_version:
+    kernel_enabled = bool(args.kernel or args.kernel_artifact or args.kernel_commit)
+    kernel_mode = "artifact" if args.kernel_artifact else "build"
+    kernel_version = args.kernel_version or ""
+    if kernel_enabled and kernel_mode == "build" and not kernel_version and not args.kernel_commit:
         kernel_version = DEFAULT_KERNEL_VERSION
 
     project_name = getattr(args, "project_name", None) or _project_name(target)
@@ -163,9 +178,22 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
             extra_packages=args.package,
         ),
         kernel=KernelConfig(
-            enabled=args.kernel,
-            version=kernel_version or "",
+            enabled=kernel_enabled,
+            mode=kernel_mode,
+            version=kernel_version,
+            commit=args.kernel_commit or "",
+            repo=args.kernel_repo or DEFAULT_KERNEL_REPO,
+            config=args.kernel_config or "defconfig",
+            fragments=args.kernel_fragment,
+            options=_parse_kernel_options(args.kernel_option),
+            targets=args.kernel_target or ["bzImage"],
+            make_args=args.kernel_make_arg,
+            jobs=args.kernel_jobs,
             rootfs=args.rootfs,
+            artifact=args.kernel_artifact or "",
+            artifact_type=args.kernel_artifact_type,
+            initrd=args.kernel_initrd or "",
+            append=args.kernel_append or "",
         ),
     )
     config.validate()

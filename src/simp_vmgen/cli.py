@@ -182,6 +182,46 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--root-password", metavar="PASSWORD")
     p.add_argument("--kernel", action="store_true", help="enable a custom kernel")
     p.add_argument("--kernel-version", metavar="VERSION")
+    p.add_argument("--kernel-commit", metavar="SHA")
+    p.add_argument("--kernel-repo", metavar="URL")
+    p.add_argument("--kernel-config", metavar="TARGET_OR_FILE")
+    p.add_argument(
+        "--kernel-fragment",
+        action="append",
+        default=[],
+        metavar="FILE",
+        help="Kconfig fragment (repeatable)",
+    )
+    p.add_argument(
+        "--kernel-option",
+        action="append",
+        default=[],
+        metavar="CONFIG_X=Y",
+        help="Kconfig option override (repeatable)",
+    )
+    p.add_argument(
+        "--kernel-target",
+        action="append",
+        default=[],
+        metavar="TARGET",
+        help="make target such as bzImage or modules (repeatable)",
+    )
+    p.add_argument(
+        "--kernel-make-arg",
+        action="append",
+        default=[],
+        metavar="ARG",
+        help="extra make argument such as LLVM=1 (repeatable)",
+    )
+    p.add_argument("--kernel-jobs", type=int, default=0, metavar="N")
+    p.add_argument("--kernel-artifact", metavar="PATH")
+    p.add_argument(
+        "--kernel-artifact-type",
+        choices=("bzImage", "vmlinuz", "vmlinux", "Image"),
+        default="bzImage",
+    )
+    p.add_argument("--kernel-initrd", metavar="PATH")
+    p.add_argument("--kernel-append", metavar="ARGS")
     p.add_argument("--rootfs", default="busybox", metavar="NAME")
     p.add_argument("--force", action="store_true", help="overwrite a non-empty directory")
     _add_local_dry_run(p)

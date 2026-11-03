@@ -81,6 +81,16 @@ def test_kernel_build_dry_run(
     assert "would build kernel" in capsys.readouterr().out
 
 
+def test_kernel_status(tmp_path: Path, capsys) -> None:
+    _config(tmp_path, ["bzImage"])
+    assert kernel.kernel_status(SimpleNamespace(directory=str(tmp_path))) == 0
+    out = capsys.readouterr().out
+    assert "mode    : build" in out
+    assert "source  : tarball 6.1.0" in out
+    assert "image   :" in out
+    assert "initrd  :" in out
+
+
 def test_kernel_clean(tmp_path: Path) -> None:
     config = _config(tmp_path, ["bzImage"])
     layout = ProjectLayout(tmp_path, config)

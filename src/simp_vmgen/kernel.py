@@ -5,14 +5,15 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .config import LOCK_FILENAME, Config
 from .distros import load_distro
 from .errors import ProjectError
-from .initramfs import kernel_initramfs
-from .kernel_source import apply_to_lock, resolve_source
+from .initramfs import build_initramfs, kernel_initramfs
+from .kernel_source import apply_to_lock, artifact_path, resolve_source
 from .layout import ProjectLayout
 from .lock import Lock, create_lock
 from .paths import load_project
@@ -160,13 +161,21 @@ def built_image_path(config: Config, layout: ProjectLayout) -> Path | None:
     return None
 
 
-def kernel_build(args: Any) -> int:
-    root, config, layout = _project(args)
-    if not config.kernel.enabled:
-        raise ProjectError("kernel support is not enabled in vmgen.toml")
+@dataclass(frozen=True, slots=True)
+class KernelArtifacts:
+    image: Path
+    initrd: Path
+
+
+def build_kernel(
+    config: Config,
+    root: Path,
+    layout: ProjectLayout,
+    *,
+    dry_run: bool = False,
+) -> Path | None:
     if config.kernel.mode == "artifact":
         raise ProjectError("kernel build is not available in artifact mode")
-    dry_run = getattr(args, "dry_run", False)
     info = resolve_source(config, root, layout, dry_run=dry_run)
     build = kernel_build_dir(layout)
     if not dry_run and not (build / ".config").is_file():
@@ -183,13 +192,71 @@ def kernel_build(args: Any) -> int:
             "modules_install",
             extra_args=[f"INSTALL_MOD_PATH={modules_dir}"],
         )
+    return built_image_path(config, layout)
+
+
+def kernel_image_path(config: Config, layout: ProjectLayout) -> Path:
+    if config.kernel.mode == "artifact":
+        return artifact_path(config, layout.root)
     image = built_image_path(config, layout)
+    if image is None or not image.is_file():
+        raise ProjectError("kernel image is missing; run `simp-vmgen kernel build`")
+    return image
+
+
+def kernel_initrd_path(config: Config, layout: ProjectLayout) -> Path:
+    if config.kernel.initrd:
+        path = Path(config.kernel.initrd).expanduser()
+        if not path.is_absolute():
+            path = layout.root / path
+        path = path.resolve()
+        if not path.is_file():
+            raise ProjectError(f"kernel initrd not found: {path}")
+        return path
+    path = layout.kernel_dir / "initramfs.cpio.gz"
+    if not path.is_file():
+        raise ProjectError("kernel initramfs is missing; run `simp-vmgen kernel initramfs`")
+    return path
+
+
+def ensure_kernel_artifacts(
+    config: Config, root: Path, layout: ProjectLayout, *, dry_run: bool = False
+) -> KernelArtifacts:
+    if not config.kernel.enabled:
+        raise ProjectError("kernel support is not enabled in vmgen.toml")
+    image: Path | None
+    if config.kernel.mode == "artifact":
+        image = artifact_path(config, root)
+    else:
+        image = built_image_path(config, layout)
+        if image is None or not image.is_file():
+            image = build_kernel(config, root, layout, dry_run=dry_run) or image
+        if image is None:
+            if dry_run:
+                image = layout.kernel_dir / "build" / "vmlinux"
+            else:
+                raise ProjectError("kernel build did not produce a bootable image")
+    if config.kernel.initrd:
+        initrd = kernel_initrd_path(config, layout)
+    else:
+        initrd = build_initramfs(config, layout, dry_run=dry_run)
+    return KernelArtifacts(image=image, initrd=initrd)
+
+
+def kernel_build(args: Any) -> int:
+    root, config, layout = _project(args)
+    if not config.kernel.enabled:
+        raise ProjectError("kernel support is not enabled in vmgen.toml")
+    if config.kernel.mode == "artifact":
+        raise ProjectError("kernel build is not available in artifact mode")
+    dry_run = getattr(args, "dry_run", False)
+    image = build_kernel(config, root, layout, dry_run=dry_run)
     if dry_run:
-        print(f"would build kernel in {build}")
+        print(f"would build kernel in {kernel_build_dir(layout)}")
     elif image is not None and image.is_file():
         print(f"kernel image: {image}")
     else:
-        print(f"kernel build finished in {build}")
+        print(f"kernel build finished in {kernel_build_dir(layout)}")
     return 0
 
 
@@ -228,6 +295,37 @@ def kernel_fetch(args: Any) -> int:
     return 0
 
 
+def kernel_status(args: Any) -> int:
+    root, config, layout = _project(args)
+    if not config.kernel.enabled:
+        print("kernel: disabled")
+        return 0
+    print(f"mode    : {config.kernel.mode}")
+    if config.kernel.mode == "artifact":
+        print(f"artifact: {config.kernel.artifact} ({config.kernel.artifact_type})")
+    elif config.kernel.commit:
+        print(f"source  : git {config.kernel.repo} @ {config.kernel.commit}")
+        print(f"tree    : {layout.kernel_dir / 'src' / 'linux-git'}")
+    else:
+        print(f"source  : tarball {config.kernel.version}")
+        print(f"tree    : {layout.kernel_dir / 'src' / f'linux-{config.kernel.version}'}")
+    print(f"build   : {kernel_build_dir(layout)}")
+    image = built_image_path(config, layout)
+    if image is not None:
+        print(f"image   : {image} ({'present' if image.is_file() else 'missing'})")
+    initrd = (
+        Path(config.kernel.initrd)
+        if config.kernel.initrd
+        else layout.kernel_dir / "initramfs.cpio.gz"
+    )
+    print(f"initrd  : {initrd} ({'present' if initrd.is_file() else 'missing'})")
+    lock_path = root / LOCK_FILENAME
+    if lock_path.is_file():
+        lock = Lock.load(lock_path)
+        print(f"lock    : {lock.kernel.source or '(empty)'}")
+    return 0
+
+
 def kernel_dispatch(args: Any) -> int:
     command = getattr(args, "kernel_command", None)
     if command == "fetch":
@@ -238,6 +336,8 @@ def kernel_dispatch(args: Any) -> int:
         return kernel_build(args)
     if command == "initramfs":
         return kernel_initramfs(args)
+    if command == "status":
+        return kernel_status(args)
     if command == "clean":
         return kernel_clean(args)
     raise ProjectError(f"kernel {command or ''} is not implemented yet")

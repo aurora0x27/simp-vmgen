@@ -63,6 +63,63 @@ def test_new_multiple_users_and_non_root_login(tmp_path: Path) -> None:
     assert {user.name for user in config.users} == {"root", "alice", "bob"}
 
 
+def test_new_kernel_artifact_and_options(tmp_path: Path) -> None:
+    target = tmp_path / "kernel-lab"
+    artifact = tmp_path / "bzImage"
+    artifact.write_bytes(b"kernel")
+    assert (
+        main(
+            [
+                "new",
+                str(target),
+                "--kernel-artifact",
+                str(artifact),
+                "--kernel-artifact-type",
+                "bzImage",
+                "--kernel-initrd",
+                str(tmp_path / "initrd"),
+                "--kernel-append",
+                "loglevel=7",
+            ]
+        )
+        == EXIT_OK
+    )
+    config = Config.load(target / "vmgen.toml")
+    assert config.kernel.enabled is True
+    assert config.kernel.mode == "artifact"
+    assert config.kernel.artifact == str(artifact)
+    assert config.kernel.append == "loglevel=7"
+
+
+def test_new_kernel_build_options(tmp_path: Path) -> None:
+    target = tmp_path / "kernel-build"
+    assert (
+        main(
+            [
+                "new",
+                str(target),
+                "--kernel-version",
+                "6.12.5",
+                "--kernel-option",
+                "CONFIG_DEBUG_INFO=y",
+                "--kernel-fragment",
+                "fragment.config",
+                "--kernel-target",
+                "bzImage",
+                "--kernel-make-arg",
+                "LLVM=1",
+            ]
+        )
+        == EXIT_OK
+    )
+    config = Config.load(target / "vmgen.toml")
+    assert config.kernel.mode == "build"
+    assert config.kernel.version == "6.12.5"
+    assert config.kernel.options == {"CONFIG_DEBUG_INFO": "y"}
+    assert config.kernel.fragments == ["fragment.config"]
+    assert config.kernel.make_args == ["LLVM=1"]
+
+
 def test_new_root_password_and_user_details(tmp_path: Path) -> None:
     target = tmp_path / "team-details"
     assert (

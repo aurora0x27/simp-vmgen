@@ -44,6 +44,21 @@ def test_build_initramfs(tmp_path: Path) -> None:
     assert "etc/passwd" in listing
 
 
+def test_initramfs_applet_symlinks_are_relative(tmp_path: Path) -> None:
+    (tmp_path / "work").mkdir()
+    fake = tmp_path / "fake-busybox"
+    fake.write_text("#!/bin/sh\necho sh\necho mount\n")
+    fake.chmod(0o755)
+    config = Config.default("lab")
+    config.kernel = KernelConfig(enabled=True, version="6.1.0")
+    config.validate()
+    layout = ProjectLayout(tmp_path, config)
+    build_initramfs(config, layout, busybox_path=fake, install_applets=True)
+    sh = layout.kernel_dir / "initramfs" / "bin" / "sh"
+    assert sh.is_symlink()
+    assert sh.readlink() == Path("busybox")
+
+
 def test_initramfs_dry_run(tmp_path: Path) -> None:
     config = Config.default("lab")
     config.kernel = KernelConfig(enabled=True, version="6.1.0")

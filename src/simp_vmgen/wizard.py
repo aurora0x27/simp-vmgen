@@ -8,7 +8,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from .config import DEFAULT_ROOT_PASSWORD, DEFAULT_SSH_KEY
+from .config import DEFAULT_KERNEL_REPO, DEFAULT_ROOT_PASSWORD, DEFAULT_SSH_KEY
 from .distros import Distro, load_distro
 from .errors import ProjectError
 
@@ -161,6 +161,10 @@ def _ask_users(
     return names
 
 
+def _list_answer(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def _ask_mounts(args: argparse.Namespace, input_fn: InputFn, output_fn: OutputFn) -> None:
     answer = _ask("Volumes (SRC:DST[:ro], comma separated)", "work:/work", input_fn)
     args.volume = [item.strip() for item in answer.split(",") if item.strip()]
@@ -185,6 +189,16 @@ def _ask_packages(
     args.package = [item.strip() for item in extra.split(",") if item.strip()]
 
 
+def _kernel_summary(args: argparse.Namespace) -> str:
+    if not args.kernel:
+        return "no"
+    if args.kernel_artifact:
+        return f"artifact {args.kernel_artifact} ({args.kernel_artifact_type})"
+    if args.kernel_commit:
+        return f"commit {args.kernel_commit}"
+    return f"version {args.kernel_version}"
+
+
 def _summary(args: argparse.Namespace, distro: Distro, names: list[str]) -> str:
     user_text = ", ".join(names)
     lines = [
@@ -199,7 +213,7 @@ def _summary(args: argparse.Namespace, distro: Distro, names: list[str]) -> str:
         f"  packages  : {', '.join(args.package_set)}"
         + (f" + {', '.join(args.package)}" if args.package else ""),
         f"  ssh port  : {args.ssh_port}",
-        f"  kernel    : {'yes (' + args.kernel_version + ')' if args.kernel else 'no'}",
+        f"  kernel    : {_kernel_summary(args)}",
         f"  gdb       : {'yes' if args.gdb else 'no'}",
     ]
     return "\n".join(lines)
@@ -278,12 +292,67 @@ def run_wizard(
 
     output_fn("\n[advanced]")
     result.kernel = _ask_yes_no("Enable a custom kernel?", False, input_fn, output_fn)
+    result.kernel_artifact = ""
+    result.kernel_commit = ""
+    result.kernel_version = ""
+    result.rootfs = args.rootfs
     if result.kernel:
-        result.kernel_version = _ask("Kernel version", args.kernel_version or "6.12.5", input_fn)
-        result.rootfs = _ask("Kernel rootfs", args.rootfs or "busybox", input_fn)
-    else:
-        result.kernel_version = args.kernel_version
-        result.rootfs = args.rootfs
+        mode = _ask_choice(
+            "Kernel mode",
+            ("build", "artifact"),
+            "artifact" if args.kernel_artifact else "build",
+            input_fn,
+            output_fn,
+        )
+        if mode == "artifact":
+            result.kernel_artifact = _ask(
+                "Kernel artifact path", args.kernel_artifact or "", input_fn
+            )
+            while not result.kernel_artifact:
+                output_fn("an artifact path is required")
+                result.kernel_artifact = _ask("Kernel artifact path", None, input_fn)
+            result.kernel_artifact_type = _ask_choice(
+                "Artifact type",
+                ("bzImage", "vmlinuz", "vmlinux", "Image"),
+                args.kernel_artifact_type or "bzImage",
+                input_fn,
+                output_fn,
+            )
+            result.kernel_initrd = _ask(
+                "Initrd path (blank for busybox)", args.kernel_initrd or "", input_fn
+            )
+        else:
+            result.kernel_commit = _ask(
+                "Kernel commit (blank to use a version)", args.kernel_commit or "", input_fn
+            )
+            if result.kernel_commit:
+                result.kernel_repo = _ask(
+                    "Kernel git repository",
+                    args.kernel_repo or DEFAULT_KERNEL_REPO,
+                    input_fn,
+                )
+            else:
+                result.kernel_version = _ask(
+                    "Kernel version", args.kernel_version or "6.12.5", input_fn
+                )
+            result.kernel_config = _ask(
+                "Kernel config (defconfig or .config path)",
+                args.kernel_config or "defconfig",
+                input_fn,
+            )
+            result.kernel_fragment = _list_answer(
+                _ask("Kconfig fragments (comma separated)", "", input_fn)
+            )
+            result.kernel_option = _list_answer(
+                _ask("Kconfig options (CONFIG_X=y, comma separated)", "", input_fn)
+            )
+            result.kernel_target = _list_answer(
+                _ask("Kernel make targets (comma separated)", "bzImage", input_fn)
+            )
+            result.kernel_make_arg = _list_answer(
+                _ask("Extra make arguments (comma separated)", "", input_fn)
+            )
+            result.rootfs = _ask("Kernel rootfs", args.rootfs or "busybox", input_fn)
 
     result.gdb = _ask_yes_no("Enable the QEMU gdb stub?", False, input_fn, output_fn)
     result.gdb_port = _ask_port("GDB port", args.gdb_port or "auto", input_fn, output_fn)

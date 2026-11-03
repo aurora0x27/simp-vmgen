@@ -58,11 +58,31 @@ def build_argv(
         config.vm.mem,
         "-rtc",
         "base=utc",
-        "-drive",
-        f"if=virtio,file={layout.overlay},format=qcow2",
-        "-drive",
-        f"if=virtio,file={layout.seed_iso},format=raw,readonly=on",
     ]
+
+    if config.kernel.enabled:
+        from .kernel import kernel_image_path, kernel_initrd_path
+
+        append = "console=ttyS0 panic=-1"
+        if not config.kernel.initrd:
+            append += " rdinit=/init"
+        if config.kernel.append:
+            append += f" {config.kernel.append}"
+        argv += [
+            "-kernel",
+            str(kernel_image_path(config, layout)),
+            "-initrd",
+            str(kernel_initrd_path(config, layout)),
+            "-append",
+            append,
+        ]
+    else:
+        argv += [
+            "-drive",
+            f"if=virtio,file={layout.overlay},format=qcow2",
+            "-drive",
+            f"if=virtio,file={layout.seed_iso},format=raw,readonly=on",
+        ]
 
     netdev = "user,id=n0"
     if config.ssh.enabled:

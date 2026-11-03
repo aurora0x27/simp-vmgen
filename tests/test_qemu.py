@@ -77,6 +77,39 @@ def test_forced_kvm_fails_without_kvm(tmp_path: Path, monkeypatch: pytest.Monkey
         resolve_accel(layout.config)
 
 
+def test_kernel_artifact_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("simp_vmgen.qemu.kvm_available", lambda: False)
+    layout = _layout(tmp_path)
+    artifact = tmp_path / "bzImage"
+    initrd = tmp_path / "initrd"
+    artifact.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+    layout.config.kernel.enabled = True
+    layout.config.kernel.mode = "artifact"
+    layout.config.kernel.artifact = str(artifact)
+    layout.config.kernel.initrd = str(initrd)
+    layout.config.kernel.append = "loglevel=7"
+
+    distro = load_distro("ubuntu")
+    argv = build_argv(
+        layout.config,
+        distro,
+        distro.release(),
+        layout,
+        ssh_port=2222,
+        gdb_port=None,
+    )
+    assert "-kernel" in argv and str(artifact) in argv
+    assert "-initrd" in argv and str(initrd) in argv
+    append = argv[argv.index("-append") + 1]
+    assert append.startswith("console=ttyS0 panic=-1")
+    assert "loglevel=7" in append
+    assert not any(str(layout.overlay) in item for item in argv)
+    assert not any(str(layout.seed_iso) in item for item in argv)
+
+
 def test_alpine_machine_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("simp_vmgen.qemu.kvm_available", lambda: False)
     layout = _layout(tmp_path)

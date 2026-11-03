@@ -96,6 +96,18 @@ ssh_keys = ["ssh-ed25519 AAAA..."]
 non-root user for a non-root default login; root login can also be disabled
 with `permit_root_login = false` (then `ssh.user` must not be `root`).
 
+## Diagnostics
+
+```sh
+simp-vmgen diagnose                 # base checks, or infer from vmgen.toml
+simp-vmgen diagnose --profile kernel
+simp-vmgen diagnose --json
+```
+
+`diagnose` checks QEMU, image tooling, SSH, cloud-init seed tools, kernel build
+dependencies, `/dev/kvm`, cache permissions, disk space and configured ports.
+It exits non-zero when a required tool is missing.
+
 ## Development
 
 ```sh

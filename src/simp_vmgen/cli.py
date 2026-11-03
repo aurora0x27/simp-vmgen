@@ -7,6 +7,7 @@ import sys
 from collections.abc import Sequence
 
 from . import __version__
+from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .project import new_project, regen_project
 
@@ -162,7 +163,7 @@ def _add_diagnose(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument(
         "--profile",
-        choices=("cloudimg", "kernel"),
+        choices=("base", "cloudimg", "kernel"),
         default=None,
         help="limit checks to a profile",
     )
@@ -259,7 +260,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     handlers = {
         "new": new_project,
         "regen": regen_project,
-        "diagnose": _not_implemented,
+        "diagnose": diagnose,
         "show": _not_implemented,
         "build": _not_implemented,
         "run": _not_implemented,

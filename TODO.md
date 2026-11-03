@@ -9,7 +9,7 @@ stops and a commit message is provided.
 - [x] M1.2 Add the configuration model, TOML loading/saving and validation
 - [x] M1.3 Add distro discovery and the Ubuntu/Alpine metadata format
 - [x] M1.4 Implement `new` (non-interactive) and `regen --check`
-- [ ] M1.5 Implement `diagnose`
+- [x] M1.5 Implement `diagnose`
 
 ## M2 - Cloud-image environments
 

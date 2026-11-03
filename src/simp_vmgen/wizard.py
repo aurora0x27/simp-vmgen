@@ -39,9 +39,7 @@ def _ask(
     return answer if answer else (default or "")
 
 
-def _ask_yes_no(
-    prompt: str, default: bool, input_fn: InputFn, output_fn: OutputFn
-) -> bool:
+def _ask_yes_no(prompt: str, default: bool, input_fn: InputFn, output_fn: OutputFn) -> bool:
     default_text = "Y/n" if default else "y/N"
     while True:
         answer = _ask(f"{prompt} [{default_text}]", "", input_fn).lower()
@@ -76,9 +74,7 @@ def _ask_size(prompt: str, default: str, input_fn: InputFn, output_fn: OutputFn)
         output_fn("use a size such as 512M, 2G or 30G")
 
 
-def _ask_int(
-    prompt: str, default: int, input_fn: InputFn, output_fn: OutputFn
-) -> int:
+def _ask_int(prompt: str, default: int, input_fn: InputFn, output_fn: OutputFn) -> int:
     while True:
         answer = _ask(prompt, str(default), input_fn)
         if answer.isdigit() and int(answer) > 0:
@@ -126,9 +122,7 @@ def _ask_users(
     create_root = _ask_yes_no("Create the root account?", True, input_fn, output_fn)
     if create_root:
         args.no_root_user = False
-        args.root_password = _ask(
-            "Root password", DEFAULT_ROOT_PASSWORD, input_fn
-        )
+        args.root_password = _ask("Root password", DEFAULT_ROOT_PASSWORD, input_fn)
         names.append("root")
     else:
         args.no_root_user = True
@@ -145,9 +139,7 @@ def _ask_users(
             output_fn(f"user {name!r} already exists")
             continue
         password = _ask(f"Password for {name}", "", input_fn)
-        shell = _ask(
-            f"Shell for {name}", distro.default_shell, input_fn
-        )
+        shell = _ask(f"Shell for {name}", distro.default_shell, input_fn)
         sudo = _ask_yes_no(f"Grant passwordless sudo to {name}?", False, input_fn, output_fn)
         groups = _ask(f"Groups for {name} (comma separated)", "", input_fn)
         keys = _ask(f"SSH public keys for {name} (comma separated)", "", input_fn)
@@ -170,9 +162,7 @@ def _ask_users(
 
 
 def _ask_mounts(args: argparse.Namespace, input_fn: InputFn, output_fn: OutputFn) -> None:
-    answer = _ask(
-        "Volumes (SRC:DST[:ro], comma separated)", "work:/work", input_fn
-    )
+    answer = _ask("Volumes (SRC:DST[:ro], comma separated)", "work:/work", input_fn)
     args.volume = [item.strip() for item in answer.split(",") if item.strip()]
 
 
@@ -232,8 +222,7 @@ def run_wizard(
     result.project_name = _ask("Project name", default_name, input_fn)
     while _PROJECT_RE.match(result.project_name) is None:
         output_fn(
-            "project names must start with a letter/digit and use letters, "
-            "digits, '.', '_' or '-'"
+            "project names must start with a letter/digit and use letters, digits, '.', '_' or '-'"
         )
         result.project_name = _ask("Project name", None, input_fn)
 
@@ -290,9 +279,7 @@ def run_wizard(
     output_fn("\n[advanced]")
     result.kernel = _ask_yes_no("Enable a custom kernel?", False, input_fn, output_fn)
     if result.kernel:
-        result.kernel_version = _ask(
-            "Kernel version", args.kernel_version or "6.12.5", input_fn
-        )
+        result.kernel_version = _ask("Kernel version", args.kernel_version or "6.12.5", input_fn)
         result.rootfs = _ask("Kernel rootfs", args.rootfs or "busybox", input_fn)
     else:
         result.kernel_version = args.kernel_version

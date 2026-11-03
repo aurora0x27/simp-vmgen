@@ -30,9 +30,7 @@ from .state import RunState, utc_now
 
 def _run_command(argv: list[str], what: str, *, timeout: int | None = None) -> None:
     try:
-        result = subprocess.run(
-            argv, capture_output=True, text=True, check=False, timeout=timeout
-        )
+        result = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=timeout)
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProjectError(f"{what} failed: {exc}") from exc
     if result.returncode != 0:
@@ -210,9 +208,7 @@ def run(args: Any) -> int:
     ssh_port = resolve_port(config.ssh.host, config.ssh.port, start=2222)
     gdb_port = None
     if config.gdb.enabled:
-        gdb_port = resolve_port(
-            "127.0.0.1", config.gdb.port, start=1234, exclude={ssh_port}
-        )
+        gdb_port = resolve_port("127.0.0.1", config.gdb.port, start=1234, exclude={ssh_port})
 
     foreground = getattr(args, "foreground", False)
     argv = build_argv(
@@ -243,9 +239,7 @@ def run(args: Any) -> int:
         pid = _wait_for_pid(layout)
         if pid is not None:
             _save_run_state(layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
-            _print_run_summary(
-                config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid
-            )
+            _print_run_summary(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
         return process.wait()
 
     try:
@@ -313,9 +307,7 @@ def _require_state(layout: ProjectLayout) -> RunState:
         raise ProjectError("the VM is not running; run `simp-vmgen run` first")
     state = RunState.load(layout.state_file)
     if state is None:
-        raise ProjectError(
-            "runtime state is missing; restart the VM with `simp-vmgen run`"
-        )
+        raise ProjectError("runtime state is missing; restart the VM with `simp-vmgen run`")
     return state
 
 
@@ -402,9 +394,7 @@ def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
     if not has_key and not tty:
         askpass = _askpass_env(config, layout)
         if askpass is None:
-            raise ProjectError(
-                "no SSH key or password is available for a non-interactive command"
-            )
+            raise ProjectError("no SSH key or password is available for a non-interactive command")
         env = askpass
         argv = _with_setsid(argv)
 
@@ -430,9 +420,7 @@ def guest(args: Any) -> int:
 
 def _ready_marker_seen(layout: ProjectLayout) -> bool:
     try:
-        return READY_MARKER in layout.serial_log.read_text(
-            encoding="utf-8", errors="replace"
-        )
+        return READY_MARKER in layout.serial_log.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False
 

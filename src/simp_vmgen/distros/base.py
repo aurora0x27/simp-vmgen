@@ -291,17 +291,13 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
             raise DistroError(f"{source}.image_arches.{arch}: expected a non-empty string")
         image_arches[arch] = image_arch
 
-    shell_paths_table = _table(
-        data.get("shell_paths", {}), f"{source}.shell_paths"
-    )
+    shell_paths_table = _table(data.get("shell_paths", {}), f"{source}.shell_paths")
     shell_paths: dict[str, str] = {}
     for shell, path in shell_paths_table.items():
         if not isinstance(shell, str) or not shell.strip():
             raise DistroError(f"{source}.shell_paths: invalid shell name {shell!r}")
         if not isinstance(path, str) or not path.startswith("/"):
-            raise DistroError(
-                f"{source}.shell_paths.{shell}: expected an absolute path"
-            )
+            raise DistroError(f"{source}.shell_paths.{shell}: expected an absolute path")
         shell_paths[shell] = path
 
     package_sets_value = data.get("package_sets", {})

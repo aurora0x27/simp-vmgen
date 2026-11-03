@@ -17,9 +17,7 @@ def find_project_root(start: Path | None = None) -> Path:
     for candidate in (current, *current.parents):
         if (candidate / CONFIG_FILENAME).is_file():
             return candidate
-    raise ProjectError(
-        f"no {CONFIG_FILENAME} found in {current} or any parent directory"
-    )
+    raise ProjectError(f"no {CONFIG_FILENAME} found in {current} or any parent directory")
 
 
 def resolve_project_root(directory: str | None = None) -> Path:

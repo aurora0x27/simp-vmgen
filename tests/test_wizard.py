@@ -91,9 +91,7 @@ def test_wizard_cancel() -> None:
         )
 
 
-def test_new_interactive(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_new_interactive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "interactive-lab"
     global answer_iter
     answer_iter = _answers(ANSWERS)
@@ -106,9 +104,7 @@ def test_new_interactive(
     assert config.ssh.user == "alice"
 
 
-def test_new_interactive_requires_tty(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_new_interactive_requires_tty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "no-tty"
     monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
     assert main(["new", str(target), "-i"]) == 1

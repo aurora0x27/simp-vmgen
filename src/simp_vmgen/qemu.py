@@ -95,8 +95,7 @@ def build_argv(
 
     for mount in mounts:
         options = (
-            f"local,path={mount.source},mount_tag={mount.tag},"
-            f"security_model=none,id={mount.tag}"
+            f"local,path={mount.source},mount_tag={mount.tag},security_model=none,id={mount.tag}"
         )
         if mount.readonly:
             options += ",readonly=on"

@@ -27,9 +27,7 @@ def test_ubuntu_metadata() -> None:
     release = distro.release()
     assert release.version == "24.04"
     assert release.machine == "q35"
-    assert distro.image_url(release, "x86_64").endswith(
-        "noble-server-cloudimg-amd64.img"
-    )
+    assert distro.image_url(release, "x86_64").endswith("noble-server-cloudimg-amd64.img")
     assert release.checksum_url_for("x86_64").endswith("/SHA256SUMS")
 
 

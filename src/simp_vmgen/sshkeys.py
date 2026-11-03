@@ -20,9 +20,7 @@ class SshKey:
 
 def _run(argv: list[str], what: str) -> subprocess.CompletedProcess[str]:
     try:
-        result = subprocess.run(
-            argv, capture_output=True, text=True, check=False, timeout=30
-        )
+        result = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProjectError(f"{what} failed: {exc}") from exc
     if result.returncode != 0:

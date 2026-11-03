@@ -46,9 +46,7 @@ def test_default_qemu_argv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert "-gdb" not in argv
 
 
-def test_gdb_foreground_and_snapshot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_gdb_foreground_and_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("simp_vmgen.qemu.kvm_available", lambda: False)
     layout = _layout(tmp_path)
     layout.config.gdb.enabled = True
@@ -71,9 +69,7 @@ def test_gdb_foreground_and_snapshot(
     assert "-daemonize" not in argv
 
 
-def test_forced_kvm_fails_without_kvm(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_forced_kvm_fails_without_kvm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("simp_vmgen.qemu.kvm_available", lambda: False)
     layout = _layout(tmp_path)
     layout.config.vm.accel = "kvm"

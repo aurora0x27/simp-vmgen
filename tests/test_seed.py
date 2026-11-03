@@ -101,9 +101,7 @@ def test_render_alpine_openrc_user_data(tmp_path: Path) -> None:
     sshd = files["/usr/local/sbin/simp-vmgen-ssh"]["content"]
     assert "PermitRootLogin yes" in sshd
     assert "PasswordAuthentication yes" in sshd
-    assert files["/etc/init.d/simp-vmgen-ready"]["content"].startswith(
-        "#!/sbin/openrc-run"
-    )
+    assert files["/etc/init.d/simp-vmgen-ready"]["content"].startswith("#!/sbin/openrc-run")
 
     runcmd = "\n".join(data["runcmd"])
     assert "apk add " in runcmd
@@ -134,9 +132,7 @@ def test_root_login_can_be_disabled(tmp_path: Path) -> None:
     config.ssh.permit_root_login = False
     config.validate()
     distro = load_distro("ubuntu")
-    artifacts = render_cloud_init(
-        config, distro, tmp_path, tmp_path / "run", make_iso=False
-    )
+    artifacts = render_cloud_init(config, distro, tmp_path, tmp_path / "run", make_iso=False)
     data = yaml.safe_load(artifacts.user_data.read_text())
     files = {item["path"]: item for item in data["write_files"]}
     sshd = files["/etc/ssh/sshd_config.d/01-simp-vmgen.conf"]["content"]
@@ -167,13 +163,9 @@ def test_key_only_login_omits_password_module(tmp_path: Path) -> None:
 def test_instance_id_changes_with_user_data(tmp_path: Path) -> None:
     config = _config(tmp_path)
     distro = load_distro("ubuntu")
-    first = render_cloud_init(
-        config, distro, tmp_path, tmp_path / "run1", make_iso=False
-    )
+    first = render_cloud_init(config, distro, tmp_path, tmp_path / "run1", make_iso=False)
     config.users[1].password = "changed"
-    second = render_cloud_init(
-        config, distro, tmp_path, tmp_path / "run2", make_iso=False
-    )
+    second = render_cloud_init(config, distro, tmp_path, tmp_path / "run2", make_iso=False)
     assert first.instance_id != second.instance_id
 
 
@@ -183,9 +175,7 @@ def test_extra_user_data_is_appended(tmp_path: Path) -> None:
     extra.write_text("runcmd:\n  - echo extra\n", encoding="utf-8")
     config.provision.extra_user_data = str(extra)
     distro = load_distro("ubuntu")
-    artifacts = render_cloud_init(
-        config, distro, tmp_path, tmp_path / "run", make_iso=False
-    )
+    artifacts = render_cloud_init(config, distro, tmp_path, tmp_path / "run", make_iso=False)
     assert "runcmd:\n  - echo extra" in artifacts.user_data.read_text()
 
 
@@ -211,9 +201,7 @@ def test_resolve_ssh_keys_missing_file(tmp_path: Path) -> None:
 def test_build_seed_iso(tmp_path: Path) -> None:
     config = _config(tmp_path)
     distro = load_distro("ubuntu")
-    artifacts = render_cloud_init(
-        config, distro, tmp_path, tmp_path / "run", make_iso=True
-    )
+    artifacts = render_cloud_init(config, distro, tmp_path, tmp_path / "run", make_iso=True)
     assert artifacts.seed_iso is not None
     assert artifacts.seed_iso.is_file()
     assert artifacts.seed_iso.stat().st_size > 0

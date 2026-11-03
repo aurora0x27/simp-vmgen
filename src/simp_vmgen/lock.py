@@ -63,14 +63,11 @@ class Lock:
             raise LockError(f"{source}.schema: expected an integer")
         if schema != LOCK_SCHEMA_VERSION:
             raise LockError(
-                f"{source}.schema: unsupported schema {schema} "
-                f"(expected {LOCK_SCHEMA_VERSION})"
+                f"{source}.schema: unsupported schema {schema} (expected {LOCK_SCHEMA_VERSION})"
             )
 
         image = _table(data.get("image"), f"{source}.image")
-        unknown = sorted(
-            set(image) - {"url", "filename", "checksum", "checksum_url"}
-        )
+        unknown = sorted(set(image) - {"url", "filename", "checksum", "checksum_url"})
         if unknown:
             raise LockError(f"{source}.image: unknown key(s): {', '.join(unknown)}")
         tool = _table(data.get("tool", {}), f"{source}.tool")

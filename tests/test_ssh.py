@@ -99,6 +99,4 @@ def test_run_ssh_requires_running_vm(tmp_path: Path) -> None:
     root = tmp_path / "lab"
     assert main(["new", str(root)]) == 0
     with pytest.raises(ProjectError, match="not running"):
-        runtime.guest(
-            SimpleNamespace(directory=str(root), guest_command=["true"])
-        )
+        runtime.guest(SimpleNamespace(directory=str(root), guest_command=["true"]))

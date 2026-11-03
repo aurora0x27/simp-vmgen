@@ -31,9 +31,7 @@ class RunState:
         try:
             return cls(
                 ssh_port=int(data["ssh_port"]),
-                gdb_port=(
-                    int(data["gdb_port"]) if data.get("gdb_port") is not None else None
-                ),
+                gdb_port=(int(data["gdb_port"]) if data.get("gdb_port") is not None else None),
                 pid=int(data["pid"]),
                 started_at=str(data["started_at"]),
                 instance_id=str(data.get("instance_id", "")),

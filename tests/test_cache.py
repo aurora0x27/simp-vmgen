@@ -19,12 +19,8 @@ SHA256 = hashlib.sha256(PAYLOAD).hexdigest()
 @pytest.fixture()
 def http_server(tmp_path: Path) -> Iterator[str]:
     (tmp_path / "image.qcow2").write_bytes(PAYLOAD)
-    (tmp_path / "SHA256SUMS").write_text(
-        f"{SHA256}  image.qcow2\n", encoding="utf-8"
-    )
-    handler = functools.partial(
-        http.server.SimpleHTTPRequestHandler, directory=str(tmp_path)
-    )
+    (tmp_path / "SHA256SUMS").write_text(f"{SHA256}  image.qcow2\n", encoding="utf-8")
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -45,9 +41,7 @@ def test_parse_checksum_file() -> None:
 
 
 def test_parse_single_hash_checksum_file() -> None:
-    assert cache.parse_checksum_file(f"{'c' * 128}\n", "image.qcow2") == (
-        f"sha512:{'c' * 128}"
-    )
+    assert cache.parse_checksum_file(f"{'c' * 128}\n", "image.qcow2") == (f"sha512:{'c' * 128}")
 
 
 def test_verify_checksum(tmp_path: Path) -> None:
@@ -106,9 +100,7 @@ def test_download_rejects_bad_checksum(
     assert not (tmp_path / "images" / "image.qcow2.part").exists()
 
 
-def test_download_requires_checksum(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_download_requires_checksum(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cache, "images_dir", lambda: tmp_path / "images")
     with pytest.raises(CacheError, match="no checksum"):
         cache.download("https://example.invalid/image.qcow2", "image.qcow2")

@@ -51,9 +51,7 @@ def _checksum_parts(checksum: str) -> tuple[str, str]:
     algorithm, separator, value = checksum.partition(":")
     algorithm = algorithm.lower()
     if separator != ":" or algorithm not in ("sha256", "sha512") or not value:
-        raise CacheError(
-            f"invalid checksum {checksum!r} (expected sha256:<hex> or sha512:<hex>)"
-        )
+        raise CacheError(f"invalid checksum {checksum!r} (expected sha256:<hex> or sha512:<hex>)")
     return algorithm, value.lower()
 
 
@@ -172,8 +170,6 @@ def download(
         _download_to(url, part)
         if resolved and not verify_checksum(part, resolved):
             part.unlink(missing_ok=True)
-            raise CacheError(
-                f"checksum mismatch for {filename}: expected {resolved}"
-            )
+            raise CacheError(f"checksum mismatch for {filename}: expected {resolved}")
         os.replace(part, target)
         return target, resolved

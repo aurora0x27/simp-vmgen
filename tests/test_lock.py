@@ -36,7 +36,7 @@ def test_lock_roundtrip(tmp_path: Path) -> None:
 
 def test_lock_validation() -> None:
     with pytest.raises(LockError, match="unsupported schema"):
-        Lock.loads("schema = 2\n[image]\nurl = \"x\"\n")
+        Lock.loads('schema = 2\n[image]\nurl = "x"\n')
     with pytest.raises(LockError, match="unknown key"):
         Lock.loads("schema = 1\n[image]\nextra = 1\n")
     with pytest.raises(LockError, match="invalid TOML"):

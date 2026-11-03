@@ -39,10 +39,7 @@ class GeneratedManifest:
         files_value = data.get("files", {})
         if not isinstance(files_value, dict):
             raise ProjectError(f"invalid generated manifest {path}: files must be an object")
-        files = {
-            str(name): str(digest)
-            for name, digest in files_value.items()
-        }
+        files = {str(name): str(digest) for name, digest in files_value.items()}
         return cls(files=files, tool_version=str(data.get("tool_version", __version__)))
 
     def save(self, path: Path) -> None:

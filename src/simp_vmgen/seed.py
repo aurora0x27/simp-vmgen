@@ -75,13 +75,9 @@ def _render_context(
     *,
     generated_public_key: str,
 ) -> dict[str, object]:
-    users = provision_users(
-        config, distro, root, generated_public_key=generated_public_key
-    )
+    users = provision_users(config, distro, root, generated_public_key=generated_public_key)
     mounts = resolve_mounts(config, root)
-    packages = distro.packages(
-        config.provision.package_sets, config.provision.extra_packages
-    )
+    packages = distro.packages(config.provision.package_sets, config.provision.extra_packages)
     hostname = config.project.hostname
     context: dict[str, object] = {
         "config": config,
@@ -110,9 +106,7 @@ def render_cloud_init(
     generated_public_key: str = "",
     make_iso: bool = True,
 ) -> SeedArtifacts:
-    context = _render_context(
-        config, distro, root, generated_public_key=generated_public_key
-    )
+    context = _render_context(config, distro, root, generated_public_key=generated_public_key)
     template_dir = f"{distro.name}/{distro.templates}"
     env = _environment()
     user_data = env.get_template(f"{template_dir}/user-data.j2").render(**context)
@@ -120,10 +114,7 @@ def render_cloud_init(
     if extra:
         user_data = f"{user_data.rstrip()}\n\n# extra user data\n{extra.rstrip()}\n"
 
-    instance_id = (
-        f"{config.project.hostname}-"
-        f"{hashlib.sha256(user_data.encode()).hexdigest()[:12]}"
-    )
+    instance_id = f"{config.project.hostname}-{hashlib.sha256(user_data.encode()).hexdigest()[:12]}"
     context["instance_id"] = instance_id
     meta_data = env.get_template(f"{template_dir}/meta-data.j2").render(**context)
 
@@ -188,14 +179,11 @@ def _make_seed_iso(seed_iso: Path, user_data: Path, meta_data: Path) -> None:
         ]
     else:
         raise ProjectError(
-            "no cloud-init seed tool found (install xorriso, "
-            "cloud-image-utils or genisoimage)"
+            "no cloud-init seed tool found (install xorriso, cloud-image-utils or genisoimage)"
         )
 
     try:
-        result = subprocess.run(
-            command, capture_output=True, text=True, check=False, timeout=120
-        )
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=120)
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProjectError(f"cannot create cloud-init seed: {exc}") from exc
     if result.returncode != 0:

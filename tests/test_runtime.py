@@ -56,9 +56,7 @@ def test_build_and_run_dry_run(
         capture_output=True,
         text=True,
     )
-    monkeypatch.setattr(
-        runtime, "download", lambda *args, **kwargs: (base, f"sha256:{'a' * 64}")
-    )
+    monkeypatch.setattr(runtime, "download", lambda *args, **kwargs: (base, f"sha256:{'a' * 64}"))
 
     assert runtime.build(SimpleNamespace(directory=str(root), force=True, dry_run=False)) == 0
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
@@ -67,9 +65,7 @@ def test_build_and_run_dry_run(
 
     assert (
         runtime.run(
-            SimpleNamespace(
-                directory=str(root), dry_run=True, foreground=False, snapshot=False
-            )
+            SimpleNamespace(directory=str(root), dry_run=True, foreground=False, snapshot=False)
         )
         == 0
     )

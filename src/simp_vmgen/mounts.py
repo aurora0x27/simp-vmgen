@@ -25,9 +25,7 @@ def resolve_mounts(config: Config, root: Path) -> list[ResolvedMount]:
             source = root / source
         source = source.resolve()
         if not source.is_dir():
-            raise ProjectError(
-                f"mount source for {mount.target!r} is not a directory: {source}"
-            )
+            raise ProjectError(f"mount source for {mount.target!r} is not a directory: {source}")
         resolved.append(
             ResolvedMount(
                 source=source,

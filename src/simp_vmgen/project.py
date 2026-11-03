@@ -39,6 +39,13 @@ def _project_name(target: Path) -> str:
     return name or "lab"
 
 
+def _user_by_name(users: list[UserConfig], name: str, option: str) -> UserConfig:
+    user = next((item for item in users if item.name == name), None)
+    if user is None:
+        raise ProjectError(f"{option}: user {name!r} is not defined")
+    return user
+
+
 def _parse_users(args: argparse.Namespace) -> list[UserConfig]:
     users: list[UserConfig] = []
     if not args.no_root_user:
@@ -63,6 +70,31 @@ def _parse_users(args: argparse.Namespace) -> list[UserConfig]:
             root = UserConfig("root")
             users.insert(0, root)
         root.password = args.root_password
+
+    for spec in args.user_shell:
+        name, separator, shell = spec.partition("=")
+        if not separator or not name or not shell:
+            raise ProjectError(f"invalid --user-shell {spec!r}: expected NAME=SHELL")
+        _user_by_name(users, name, "--user-shell").shell = shell
+
+    for name in args.user_sudo:
+        _user_by_name(users, name, "--user-sudo").sudo = True
+
+    for spec in args.user_group:
+        name, separator, group = spec.partition("=")
+        if not separator or not name or not group:
+            raise ProjectError(f"invalid --user-group {spec!r}: expected NAME=GROUP")
+        user = _user_by_name(users, name, "--user-group")
+        if group not in user.groups:
+            user.groups.append(group)
+
+    for spec in args.user_key:
+        name, separator, key = spec.partition("=")
+        if not separator or not name or not key:
+            raise ProjectError(f"invalid --user-key {spec!r}: expected NAME=KEY")
+        user = _user_by_name(users, name, "--user-key")
+        if key not in user.ssh_keys:
+            user.ssh_keys.append(key)
 
     if not users:
         raise ProjectError("at least one user is required")

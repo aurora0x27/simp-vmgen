@@ -18,7 +18,7 @@ stops and a commit message is provided.
 - [x] M2.3 QEMU argument builder and `build` / `run` / `stop` / `status`
 - [x] M2.4 SSH key handling, `ssh` / `tty` / `guest` / `wait`
 - [x] M2.5 `serial` / `console` / `log` / `clean`
-- [ ] M2.6 User management: root login toggle, root password, multiple users,
+- [x] M2.6 User management: root login toggle, root password, multiple users,
       per-user password/SSH keys/shell/sudo
 - [ ] M2.7 Alpine cloud-image support (OpenRC provisioning)
 - [ ] M2.8 Volume mounts (`-v SRC:DST[:ro]`) for cloud-init distros

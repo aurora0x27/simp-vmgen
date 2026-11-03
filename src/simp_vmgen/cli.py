@@ -145,6 +145,34 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
         help="add a guest user (repeatable)",
     )
     p.add_argument(
+        "--user-shell",
+        action="append",
+        default=[],
+        metavar="NAME=SHELL",
+        help="set a user's login shell (repeatable)",
+    )
+    p.add_argument(
+        "--user-sudo",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="grant passwordless sudo to a user (repeatable)",
+    )
+    p.add_argument(
+        "--user-group",
+        action="append",
+        default=[],
+        metavar="NAME=GROUP",
+        help="add a user to a group (repeatable)",
+    )
+    p.add_argument(
+        "--user-key",
+        action="append",
+        default=[],
+        metavar="NAME=PATH_OR_KEY",
+        help="add an SSH public key to a user (repeatable)",
+    )
+    p.add_argument(
         "--no-root-user",
         action="store_true",
         help="do not create the default root account",

@@ -245,6 +245,13 @@ def test_validation_errors(text: str, message: str) -> None:
         Config.loads(text)
 
 
+def test_root_login_cannot_be_disabled_for_root_user() -> None:
+    config = Config.default("lab")
+    config.ssh.permit_root_login = False
+    with pytest.raises(ConfigError, match="permit_root_login"):
+        config.validate()
+
+
 def test_login_user_needs_authentication() -> None:
     config = Config.default("lab")
     config.ssh.key = ""

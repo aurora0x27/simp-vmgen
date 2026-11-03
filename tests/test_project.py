@@ -62,6 +62,40 @@ def test_new_multiple_users_and_non_root_login(tmp_path: Path) -> None:
     assert {user.name for user in config.users} == {"root", "alice", "bob"}
 
 
+def test_new_root_password_and_user_details(tmp_path: Path) -> None:
+    target = tmp_path / "team-details"
+    assert (
+        main(
+            [
+                "new",
+                str(target),
+                "--root-password",
+                "root-secret",
+                "--user",
+                "alice:alice-secret",
+                "--user-shell",
+                "alice=/bin/bash",
+                "--user-sudo",
+                "alice",
+                "--user-group",
+                "alice=docker",
+                "--user-key",
+                "alice=ssh-ed25519 AAAA alice",
+                "--login-user",
+                "alice",
+            ]
+        )
+        == EXIT_OK
+    )
+    config = Config.load(target / "vmgen.toml")
+    assert config.get_user("root").password == "root-secret"
+    alice = config.get_user("alice")
+    assert alice.shell == "/bin/bash"
+    assert alice.sudo is True
+    assert alice.groups == ["docker"]
+    assert alice.ssh_keys == ["ssh-ed25519 AAAA alice"]
+
+
 def test_new_without_root_user(tmp_path: Path) -> None:
     target = tmp_path / "alice-only"
     assert (

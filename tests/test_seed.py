@@ -94,6 +94,27 @@ def test_root_login_can_be_disabled(tmp_path: Path) -> None:
     assert "PermitRootLogin no" in sshd
 
 
+def test_key_only_login_omits_password_module(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    for user in config.users:
+        user.password = ""
+    config.get_user("alice").ssh_keys = []
+    config.ssh.user = "alice"
+    config.validate()
+    artifacts = render_cloud_init(
+        config,
+        load_distro("ubuntu"),
+        tmp_path,
+        tmp_path / "run",
+        generated_public_key="ssh-ed25519 AAAA generated",
+        make_iso=False,
+    )
+    data = yaml.safe_load(artifacts.user_data.read_text())
+    assert data["ssh_pwauth"] is False
+    assert "chpasswd" not in data
+    assert data["users"][1]["ssh_authorized_keys"] == ["ssh-ed25519 AAAA generated"]
+
+
 def test_instance_id_changes_with_user_data(tmp_path: Path) -> None:
     config = _config(tmp_path)
     distro = load_distro("ubuntu")

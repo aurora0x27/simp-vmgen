@@ -11,6 +11,7 @@ from typing import Any
 from .config import LOCK_FILENAME, Config
 from .distros import load_distro
 from .errors import ProjectError
+from .initramfs import kernel_initramfs
 from .kernel_source import apply_to_lock, resolve_source
 from .layout import ProjectLayout
 from .lock import Lock, create_lock
@@ -195,7 +196,9 @@ def kernel_build(args: Any) -> int:
 def kernel_clean(args: Any) -> int:
     _root, _config, layout = _project(args)
     shutil.rmtree(layout.kernel_dir / "build", ignore_errors=True)
-    print(f"removed {layout.kernel_dir / 'build'}")
+    shutil.rmtree(layout.kernel_dir / "initramfs", ignore_errors=True)
+    (layout.kernel_dir / "initramfs.cpio.gz").unlink(missing_ok=True)
+    print(f"removed {layout.kernel_dir / 'build'} and initramfs")
     return 0
 
 
@@ -233,6 +236,8 @@ def kernel_dispatch(args: Any) -> int:
         return kernel_config(args)
     if command == "build":
         return kernel_build(args)
+    if command == "initramfs":
+        return kernel_initramfs(args)
     if command == "clean":
         return kernel_clean(args)
     raise ProjectError(f"kernel {command or ''} is not implemented yet")

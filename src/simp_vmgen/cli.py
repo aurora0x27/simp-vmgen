@@ -10,6 +10,10 @@ from . import __version__
 from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .project import new_project, regen_project
+from .runtime import build as runtime_build
+from .runtime import run as runtime_run
+from .runtime import status as runtime_status
+from .runtime import stop as runtime_stop
 
 PROG = "simp-vmgen"
 
@@ -262,10 +266,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "regen": regen_project,
         "diagnose": diagnose,
         "show": _not_implemented,
-        "build": _not_implemented,
-        "run": _not_implemented,
-        "stop": _not_implemented,
-        "status": _not_implemented,
+        "build": runtime_build,
+        "run": runtime_run,
+        "stop": runtime_stop,
+        "status": runtime_status,
         "wait": _not_implemented,
         "ssh": _not_implemented,
         "tty": _not_implemented,

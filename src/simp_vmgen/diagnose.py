@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .cache import cache_dir
 from .config import Config
 from .errors import ProjectError
 from .paths import load_project
@@ -80,10 +81,7 @@ def _host_arch() -> str:
 
 
 def _cache_dir() -> Path:
-    base = os.environ.get("XDG_CACHE_HOME")
-    if base:
-        return Path(base) / "simp-vmgen"
-    return Path.home() / ".cache" / "simp-vmgen"
+    return cache_dir()
 
 
 def _os_id() -> str:
@@ -265,9 +263,7 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
         selected = "base"
 
     checks: list[CheckResult] = [_check_python()]
-    checks.append(
-        _check_tool(f"qemu-system-{arch}", version_args=("--version",))
-    )
+    checks.append(_check_tool(f"qemu-system-{arch}", version_args=("--version",)))
     checks.append(_check_tool("qemu-img", version_args=("--version",)))
     checks.append(_check_tool("tar"))
     checks.append(_check_tool("gzip"))

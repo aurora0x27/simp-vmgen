@@ -17,3 +17,11 @@ class DistroError(SimpVmgenError):
 
 class ProjectError(SimpVmgenError):
     """Project creation, discovery or regeneration failure."""
+
+
+class CacheError(SimpVmgenError):
+    """Image or artifact download/cache failure."""
+
+
+class LockError(SimpVmgenError):
+    """Invalid or unwritable vmgen.lock."""

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import (
     CONFIG_FILENAME,
+    LOCK_FILENAME,
     Config,
     DistroConfig,
     GdbConfig,
@@ -21,6 +22,7 @@ from .config import (
 )
 from .distros import load_distro
 from .errors import ProjectError
+from .lock import create_lock
 from .paths import load_project
 from .render import changed_files, render_project, write_rendered
 
@@ -74,9 +76,7 @@ def _parse_mounts(args: argparse.Namespace) -> list[MountConfig]:
         if existing is not None:
             if existing.source == mount.source and existing.readonly == mount.readonly:
                 continue
-            raise ProjectError(
-                f"volume {spec!r}: target {mount.target!r} is already mounted"
-            )
+            raise ProjectError(f"volume {spec!r}: target {mount.target!r} is already mounted")
         mounts.append(mount)
     return mounts
 
@@ -140,9 +140,7 @@ def new_project(args: argparse.Namespace) -> int:
     if target.exists() and not target.is_dir():
         raise ProjectError(f"target exists and is not a directory: {target}")
     if target.exists() and any(target.iterdir()) and not args.force:
-        raise ProjectError(
-            f"target directory is not empty: {target} (use --force to overwrite)"
-        )
+        raise ProjectError(f"target directory is not empty: {target} (use --force to overwrite)")
 
     config = config_from_args(args, target)
     files = render_project(config)
@@ -150,6 +148,7 @@ def new_project(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(f"would create {target}")
         print(f"  {target / CONFIG_FILENAME}")
+        print(f"  {target / LOCK_FILENAME}")
         for item in files:
             print(f"  {target / item.path}")
         return 0
@@ -161,9 +160,13 @@ def new_project(args: argparse.Namespace) -> int:
             (target / source).mkdir(parents=True, exist_ok=True)
 
     config.save(target / CONFIG_FILENAME)
+    distro = load_distro(config.distro.name)
+    release = distro.release(config.distro.release)
+    create_lock(config, distro, release).save(target / LOCK_FILENAME)
     wrote = write_rendered(target, files)
     print(f"created {target}")
     print(f"  config: {target / CONFIG_FILENAME}")
+    print(f"  lock:   {target / LOCK_FILENAME}")
     for path in wrote:
         print(f"  file:   {path}")
     print()

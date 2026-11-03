@@ -103,6 +103,29 @@ def test_kernel_artifact_profile_checks(tmp_path: Path, monkeypatch: pytest.Monk
     assert "bc" not in names
 
 
+def test_kernel_alpine_rootfs_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from simp_vmgen.config import Config, KernelConfig
+
+    artifact = tmp_path / "bzImage"
+    artifact.write_bytes(b"kernel")
+    config = Config.default("lab")
+    config.distro.name = "alpine"
+    config.distro.release = "3.22"
+    config.kernel = KernelConfig(
+        enabled=True,
+        mode="artifact",
+        artifact=str(artifact),
+        rootfs="alpine",
+    )
+    config.validate()
+    monkeypatch.setattr(diag, "_load_optional_project", lambda directory: (tmp_path, config))
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+    report = diag.build_report(directory=str(tmp_path))
+    names = [check.name for check in report.checks]
+    assert "kernel rootfs" in names
+    assert "openssl" in names
+
+
 def test_diagnose_json_and_exit_code(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

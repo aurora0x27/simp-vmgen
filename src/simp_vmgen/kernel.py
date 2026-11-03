@@ -384,6 +384,11 @@ def kernel_status(args: Any) -> int:
         print(f"source  : tarball {config.kernel.version}")
         print(f"tree    : {layout.kernel_dir / 'src' / f'linux-{config.kernel.version}'}")
     print(f"build   : {kernel_build_dir(layout)}")
+    if config.kernel.rootfs != "none":
+        spec = load_rootfs(config.kernel.rootfs)
+        rootfs_path = layout.kernel_dir / "rootfs" / spec.name
+        print(f"rootfs  : {spec.name} {spec.release} ({spec.kind})")
+        print(f"          {rootfs_path} ({'present' if rootfs_path.is_dir() else 'missing'})")
     image: Path | None
     if config.kernel.mode == "artifact":
         image = Path(config.kernel.artifact).expanduser()

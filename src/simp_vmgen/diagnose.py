@@ -17,6 +17,7 @@ from .cache import cache_dir
 from .config import Config
 from .errors import ProjectError
 from .paths import load_project
+from .rootfs import load_rootfs
 
 _STATUS_LABEL = {
     "ok": "[ok]",
@@ -287,6 +288,20 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
 
     if selected == "kernel":
         kernel = config.kernel if config is not None else None
+        rootfs_spec = None
+        if kernel is not None and kernel.rootfs != "none":
+            try:
+                rootfs_spec = load_rootfs(kernel.rootfs)
+            except ProjectError as exc:
+                checks.append(CheckResult("kernel rootfs", "missing", detail=str(exc)))
+            else:
+                checks.append(
+                    CheckResult(
+                        "kernel rootfs",
+                        "ok",
+                        detail=(f"{rootfs_spec.name} {rootfs_spec.release} ({rootfs_spec.kind})"),
+                    )
+                )
         if kernel is not None and kernel.mode == "artifact":
             root = _root or Path.cwd()
             artifact = Path(kernel.artifact).expanduser()
@@ -301,6 +316,8 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
             else:
                 checks.append(_check_tool("cpio"))
                 checks.append(_check_tool("busybox", required=False))
+                if rootfs_spec is not None and rootfs_spec.name == "alpine":
+                    checks.append(_check_tool("openssl"))
         else:
             for tool in (
                 "make",

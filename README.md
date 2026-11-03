@@ -199,7 +199,37 @@ simp-vmgen -C lab-artifact run
 `kernel.config` can be a defconfig target or a `.config` file. Extra Kconfig
 fragments, `CONFIG_*` options, make targets and arbitrary make arguments are
 configured in `[kernel]` in `vmgen.toml`. Set `kernel.initrd` to use your own
-initrd instead of the generated busybox one.
+initrd instead of the generated one.
+
+### Alpine userland with a custom kernel
+
+Use the Alpine rootfs plugin instead of the busybox initramfs:
+
+```sh
+simp-vmgen new lab-alpine-kernel \
+    --distro alpine \
+    --kernel-version 6.12.5 \
+    --rootfs alpine
+
+simp-vmgen -C lab-alpine-kernel kernel rootfs   # fetch + provision
+simp-vmgen -C lab-alpine-kernel kernel initramfs
+simp-vmgen -C lab-alpine-kernel build
+simp-vmgen -C lab-alpine-kernel run
+```
+
+The rootfs plugin installs OpenRC, OpenSSH, your configured users and packages,
+then packages the minirootfs as an initramfs. The same plugin works in artifact
+mode:
+
+```sh
+simp-vmgen new lab-alpine-artifact \
+    --distro alpine \
+    --kernel-artifact /boot/vmlinuz-linux \
+    --kernel-artifact-type vmlinuz \
+    --rootfs alpine
+```
+
+Rootfs plugins live in `src/simp_vmgen/rootfs/<name>/` and are auto-discovered.
 
 ## Diagnostics
 

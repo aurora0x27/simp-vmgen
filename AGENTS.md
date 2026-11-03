@@ -78,7 +78,10 @@ src/simp_vmgen/
 ├── attach.py         serial/monitor socket proxy and log tailing
 ├── kernel_source.py  tarball/git source acquisition
 ├── kernel.py         Kconfig, build, artifact resolution, kernel status
-├── initramfs.py      busybox initramfs builder
+├── initramfs.py      busybox/Alpine initramfs builder
+├── alpine.py         Alpine rootfs provisioning and package installation
+├── rootfs/           discoverable rootfs plugins (busybox, alpine)
+├── rootfs_source.py  rootfs archive fetch/extract and lock records
 ├── diagnose.py       host dependency checks
 ├── errors.py         expected user-facing exceptions
 └── templates/        generated project and initramfs templates
@@ -188,7 +191,10 @@ The generated `Makefile` only forwards to `simp-vmgen`; keep it that way.
 
 ### Source/rootfs limitations
 
-- Only the busybox rootfs plugin exists today.
+- Rootfs plugins are auto-discovered from `src/simp_vmgen/rootfs/<name>/`.
+- `busybox` and `alpine` rootfs plugins exist today; both are initramfs based.
+- The Alpine plugin installs packages with a pinned `apk.static`, writes users,
+  passwords, SSH keys and OpenRC runlevels, and packages the minirootfs.
 - `vmlinux` uses QEMU's `-kernel` path; verify it with the target QEMU version.
 - Do not add interactive `menuconfig` to the build pipeline. Generate config
   non-interactively instead.

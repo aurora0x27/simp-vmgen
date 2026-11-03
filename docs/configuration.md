@@ -150,7 +150,32 @@ rootfs = "busybox"
 ```
 
 Artifact mode does not fetch or build kernel sources. It boots the supplied
-kernel with either the configured initrd or a generated busybox initramfs.
+kernel with either the configured initrd or a generated rootfs.
+
+## Kernel rootfs plugins
+
+`kernel.rootfs` selects a rootfs plugin:
+
+| Value | Description |
+|---|---|
+| `busybox` | Minimal busybox initramfs |
+| `alpine` | Alpine minirootfs provisioned with OpenRC and OpenSSH |
+| `none` | Use `kernel.initrd` as-is |
+
+Alpine rootfs sources, packages and templates are defined in
+`src/simp_vmgen/rootfs/alpine/`. The plugin is auto-discovered, like distros.
+`kernel rootfs` fetches and provisions the rootfs; `kernel initramfs` packages
+it as `initramfs.cpio.gz`. Users, passwords, sudo, SSH keys, networking and 9p
+mounts are generated from the same `vmgen.toml` configuration as cloud images.
+
+Rootfs plugin metadata supports:
+
+- `kind`: `initramfs`, `disk` or `9p` (only `initramfs` is implemented today)
+- `source_url` / checksum
+- `packages`
+- `templates`
+- `init`
+- `apk_tools_url` and checksum for Alpine package installation
 
 ## Lock file
 

@@ -41,6 +41,7 @@ def _run_make(
     target: str,
     *,
     dry_run: bool = False,
+    extra_args: list[str] | None = None,
 ) -> None:
     make = shutil.which("make")
     if make is None:
@@ -52,6 +53,7 @@ def _run_make(
         str(source),
         f"O={build}",
         *config.kernel.make_args,
+        *(extra_args or []),
     ]
     if target in ("bzImage", "vmlinux", "modules", "all"):
         argv.append(f"-j{jobs}")
@@ -146,6 +148,57 @@ def kernel_config(args: Any) -> int:
     return 0
 
 
+def built_image_path(config: Config, layout: ProjectLayout) -> Path | None:
+    build = kernel_build_dir(layout)
+    if "bzImage" in config.kernel.targets:
+        return build / "arch" / "x86" / "boot" / "bzImage"
+    if "vmlinux" in config.kernel.targets:
+        return build / "vmlinux"
+    if "Image" in config.kernel.targets:
+        return build / "arch" / "arm64" / "boot" / "Image"
+    return None
+
+
+def kernel_build(args: Any) -> int:
+    root, config, layout = _project(args)
+    if not config.kernel.enabled:
+        raise ProjectError("kernel support is not enabled in vmgen.toml")
+    if config.kernel.mode == "artifact":
+        raise ProjectError("kernel build is not available in artifact mode")
+    dry_run = getattr(args, "dry_run", False)
+    info = resolve_source(config, root, layout, dry_run=dry_run)
+    build = kernel_build_dir(layout)
+    if not dry_run and not (build / ".config").is_file():
+        configure_kernel(config, root, info.path, layout)
+    for target in config.kernel.targets:
+        _run_make(info.path, build, config, target, dry_run=dry_run)
+    if "modules" in config.kernel.targets and not dry_run:
+        modules_dir = layout.kernel_dir / "modules"
+        modules_dir.mkdir(parents=True, exist_ok=True)
+        _run_make(
+            info.path,
+            build,
+            config,
+            "modules_install",
+            extra_args=[f"INSTALL_MOD_PATH={modules_dir}"],
+        )
+    image = built_image_path(config, layout)
+    if dry_run:
+        print(f"would build kernel in {build}")
+    elif image is not None and image.is_file():
+        print(f"kernel image: {image}")
+    else:
+        print(f"kernel build finished in {build}")
+    return 0
+
+
+def kernel_clean(args: Any) -> int:
+    _root, _config, layout = _project(args)
+    shutil.rmtree(layout.kernel_dir / "build", ignore_errors=True)
+    print(f"removed {layout.kernel_dir / 'build'}")
+    return 0
+
+
 def kernel_fetch(args: Any) -> int:
     root, config, layout = _project(args)
     layout.ensure()
@@ -178,4 +231,8 @@ def kernel_dispatch(args: Any) -> int:
         return kernel_fetch(args)
     if command == "config":
         return kernel_config(args)
+    if command == "build":
+        return kernel_build(args)
+    if command == "clean":
+        return kernel_clean(args)
     raise ProjectError(f"kernel {command or ''} is not implemented yet")

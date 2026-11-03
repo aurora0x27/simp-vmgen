@@ -26,6 +26,15 @@ def test_port_allocation() -> None:
         assert chosen != busy
 
 
+def test_long_project_path_uses_short_socket_dir(tmp_path: Path) -> None:
+    from simp_vmgen.config import Config
+
+    root = tmp_path / ("long-project-" + "x" * 70)
+    layout = runtime.ProjectLayout(root, Config.default("long"))
+    assert len(str(layout.serial_sock)) < 108
+    assert layout.socket_dir != layout.run_dir
+
+
 def test_state_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "state.json"
     state = RunState(ssh_port=2222, gdb_port=1234, pid=42, started_at="now")

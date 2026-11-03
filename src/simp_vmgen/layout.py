@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,12 +54,20 @@ class ProjectLayout:
         return self.run_dir / "state.json"
 
     @property
+    def socket_dir(self) -> Path:
+        candidate = self.run_dir / "serial.sock"
+        if len(str(candidate)) < 100:
+            return self.run_dir
+        digest = hashlib.sha1(str(self.root).encode()).hexdigest()[:12]
+        return Path(tempfile.gettempdir()) / f"simp-vmgen-{digest}"
+
+    @property
     def serial_sock(self) -> Path:
-        return self.run_dir / "serial.sock"
+        return self.socket_dir / "serial.sock"
 
     @property
     def monitor_sock(self) -> Path:
-        return self.run_dir / "monitor.sock"
+        return self.socket_dir / "monitor.sock"
 
     @property
     def serial_log(self) -> Path:
@@ -75,3 +85,4 @@ class ProjectLayout:
     def ensure(self) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.ssh_dir.mkdir(parents=True, exist_ok=True)
+        self.socket_dir.mkdir(parents=True, exist_ok=True)

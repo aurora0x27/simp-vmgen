@@ -176,6 +176,11 @@ def _cleanup_runtime(layout: ProjectLayout, *, remove_state: bool = True) -> Non
         layout.state_file.unlink(missing_ok=True)
 
 
+def _cleanup_socket_dir(layout: ProjectLayout) -> None:
+    if layout.socket_dir != layout.run_dir:
+        shutil.rmtree(layout.socket_dir, ignore_errors=True)
+
+
 def _wait_for_pid(layout: ProjectLayout, timeout: float = 5.0) -> int | None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -296,6 +301,7 @@ def stop(args: Any) -> int:
         with contextlib.suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)
     _cleanup_runtime(layout)
+    _cleanup_socket_dir(layout)
     print(f"stopped QEMU (pid {pid})")
     return 0
 
@@ -510,6 +516,7 @@ def clean(args: Any) -> int:
     root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(root, config)
     stop(args)
+    _cleanup_socket_dir(layout)
     if getattr(args, "all", False):
         shutil.rmtree(layout.runtime_dir, ignore_errors=True)
         print(f"removed {layout.runtime_dir}")

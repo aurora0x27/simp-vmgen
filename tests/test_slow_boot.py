@@ -67,6 +67,46 @@ def test_alpine_cloud_image_boot(tmp_path: Path) -> None:
         _stop(root)
 
 
+def test_alpine_rootfs_with_kernel_artifact(tmp_path: Path) -> None:
+    kernel_image = Path("/boot/vmlinuz-linux")
+    if not kernel_image.is_file():
+        pytest.skip("no host vmlinuz to boot")
+    if shutil.which("qemu-system-x86_64") is None or shutil.which("cpio") is None:
+        pytest.skip("QEMU or cpio is not installed")
+
+    root = tmp_path / "alpine-kernel-rootfs"
+    assert (
+        main(
+            [
+                "new",
+                str(root),
+                "--distro",
+                "alpine",
+                "--kernel-artifact",
+                str(kernel_image),
+                "--kernel-artifact-type",
+                "vmlinuz",
+                "--rootfs",
+                "alpine",
+                "--mem",
+                "2G",
+                "--cpus",
+                "2",
+            ]
+        )
+        == 0
+    )
+    config = Config.load(root / "vmgen.toml")
+    config.provision.package_sets = []
+    config.save(root / "vmgen.toml")
+    try:
+        assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+        assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
+        assert runtime.wait(_args(root, timeout=300)) == 0
+    finally:
+        _stop(root)
+
+
 def test_kernel_artifact_boot(tmp_path: Path) -> None:
     kernel_image = Path("/boot/vmlinuz-linux")
     if not kernel_image.is_file():

@@ -74,6 +74,30 @@ def test_build_and_run_dry_run(
     assert "-drive" in out
 
 
+def test_gdb_reports_connection(tmp_path: Path, capsys) -> None:
+    root = tmp_path / "gdb"
+    assert main(["new", str(root), "--gdb"]) == 0
+    layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
+    layout.ensure()
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        RunState(
+            ssh_port=2222,
+            gdb_port=1234,
+            pid=process.pid,
+            started_at="now",
+        ).save(layout.state_file)
+        assert runtime.gdb(SimpleNamespace(directory=str(root), connect=False)) == 0
+        out = capsys.readouterr().out
+        assert "127.0.0.1:1234" in out
+        assert "target remote" in out
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
 def test_status_and_stop(tmp_path: Path) -> None:
     root = _project(tmp_path)
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])

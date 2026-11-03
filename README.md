@@ -6,9 +6,23 @@ Generate reproducible QEMU lab environments from a small TOML project file.
 `vmgen.toml`, a `Makefile` that forwards to `simp-vmgen`, and a generated
 `README.md`; all build and runtime logic lives in the installed tool.
 
+It intentionally covers simple workflows:
+
+- cloud-image VMs with cloud-init, SSH, serial and 9p shares
+- Ubuntu and Alpine guests
+- kernel source fetch/build from a version or commit
+- booting an existing `bzImage` / `vmlinuz` / `vmlinux`
+- a busybox initramfs rootfs for kernel experiments
+
+It is not a kernel development environment, a multi-VM orchestrator, or a
+replacement for tools such as `virtme-ng`.
+
 ## Status
 
-Under active development. See [TODO.md](TODO.md) for the current progress.
+Usable for cloud-image labs, Alpine/Ubuntu experiments, custom kernel builds
+and existing kernel artifacts. See [TODO.md](TODO.md) for the remaining polish
+work and [docs/configuration.md](docs/configuration.md) for the full config
+reference.
 
 ## Install
 
@@ -30,8 +44,40 @@ simp-vmgen -C lab-ebpf tty
 simp-vmgen diagnose
 ```
 
-Planned distro support: Ubuntu 24.04 and Alpine 3.22. Planned kernel rootfs
-support starts with a static busybox initramfs.
+Distro support: Ubuntu 24.04 and Alpine 3.22. Kernel rootfs support uses a
+static busybox initramfs by default.
+
+### CLI reference
+
+| Command | Purpose |
+|---|---|
+| `new` | Create a project, optionally with `-i` |
+| `regen` | Re-render thin project files; `--check`, `--force` |
+| `show` | Show resolved config; `--json` |
+| `diagnose` | Check host dependencies |
+| `build` | Prepare image/seed or kernel/initramfs |
+| `run` | Start QEMU (`--foreground`, `--snapshot`) |
+| `wait` | Wait for the readiness marker |
+| `tty` / `ssh` / `guest` | SSH login or run a guest command |
+| `serial` / `console` | Attach to serial or QEMU monitor |
+| `log` | Show or follow the serial log |
+| `status` / `stop` / `clean` | Inspect, stop or remove runtime state |
+| `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow |
+| `gdb` | Connect to the QEMU gdb stub |
+
+### Project layout
+
+```text
+lab/
+├── vmgen.toml
+├── vmgen.lock
+├── Makefile
+├── README.md
+├── .gitignore
+├── work/
+└── .simp-vmgen/       # ignored runtime state
+```
+
 
 ## Configuration
 
@@ -166,6 +212,21 @@ simp-vmgen diagnose --json
 dependencies, `/dev/kvm`, cache permissions, disk space and configured ports.
 It exits non-zero when a required tool is missing.
 
+## Troubleshooting
+
+- **`wait` times out**: run `simp-vmgen log -f` and inspect
+  `.simp-vmgen/run/serial.log`; the readiness marker is
+  `SIMP_VMGEN_READY`.
+- **Port already in use**: use `--ssh-port auto` / `--gdb-port auto`, or stop
+  the other VM.
+- **Slow boot**: check `diagnose`; without `/dev/kvm` QEMU falls back to TCG.
+- **`regen` reports a conflict**: the file was edited locally. Move the change
+  into `vmgen.toml` or run `simp-vmgen regen --force`.
+- **Kernel artifact cannot mount `/work`**: the supplied kernel needs 9p
+  support. Source builds enable `CONFIG_9P_FS` and virtio by default; for an
+  external kernel, provide a matching initrd/modules or use a kernel built with
+  those options.
+
 ## Development
 
 ```sh
@@ -173,4 +234,12 @@ uv sync
 uv run pytest
 uv run ruff check .
 uv run mypy src
+uv run ruff format --check .
+```
+
+Opt-in integration tests:
+
+```sh
+SIMP_VMGEN_SLOW=1 uv run pytest -m slow      # boots real QEMU guests
+SIMP_VMGEN_INSTALL_TEST=1 uv run pytest -m install  # uv tool install smoke test
 ```

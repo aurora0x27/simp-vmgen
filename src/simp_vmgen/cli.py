@@ -14,6 +14,7 @@ from .project import new_project, regen_project, show_project
 from .runtime import build as runtime_build
 from .runtime import clean as runtime_clean
 from .runtime import console as runtime_console
+from .runtime import gdb as runtime_gdb
 from .runtime import guest as runtime_guest
 from .runtime import log as runtime_log
 from .runtime import run as runtime_run
@@ -29,7 +30,6 @@ PROG = "simp-vmgen"
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
-EXIT_NOT_IMPLEMENTED = 3
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -339,14 +339,6 @@ def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--connect", action="store_true", help="start gdb automatically")
 
 
-def _not_implemented(args: argparse.Namespace) -> int:
-    command = args.command
-    if command == "kernel" and getattr(args, "kernel_command", None):
-        command = f"kernel {args.kernel_command}"
-    print(f"{PROG}: '{command}' is not implemented yet", file=sys.stderr)
-    return EXIT_NOT_IMPLEMENTED
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -373,7 +365,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "guest": runtime_guest,
         "clean": runtime_clean,
         "kernel": kernel_dispatch,
-        "gdb": _not_implemented,
+        "gdb": runtime_gdb,
     }
 
     try:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from simp_vmgen import __version__
-from simp_vmgen.cli import EXIT_NOT_IMPLEMENTED, EXIT_OK, build_parser, main
+from simp_vmgen.cli import EXIT_OK, build_parser, main
 
 
 def test_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -51,11 +51,6 @@ def test_kernel_subcommands_are_registered() -> None:
         args = parser.parse_args(["kernel", name])
         assert args.command == "kernel"
         assert args.kernel_command == name
-
-
-def test_placeholder_handler(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["gdb"]) == EXIT_NOT_IMPLEMENTED
-    assert "not implemented yet" in capsys.readouterr().err
 
 
 def test_new_volume_options() -> None:

@@ -461,6 +461,23 @@ def wait(args: Any) -> int:
     )
 
 
+def gdb(args: Any) -> int:
+    _root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(_root, config)
+    state = _require_state(layout)
+    if not config.gdb.enabled or state.gdb_port is None:
+        raise ProjectError("the gdb stub is not enabled for this VM")
+    command = ["gdb", "-ex", f"target remote 127.0.0.1:{state.gdb_port}"]
+    if getattr(args, "connect", False):
+        try:
+            return subprocess.run(command, check=False).returncode
+        except OSError as exc:
+            raise ProjectError(f"cannot run gdb: {exc}") from exc
+    print(f"gdb port : 127.0.0.1:{state.gdb_port}")
+    print(f"connect  : {' '.join(command)}")
+    return 0
+
+
 def serial(args: Any) -> int:
     _root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(_root, config)

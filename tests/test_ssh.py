@@ -61,7 +61,30 @@ def test_ssh_argv(tmp_path: Path) -> None:
     assert "-t" in argv
     assert "BatchMode=yes" in argv
     assert "root@127.0.0.1" in argv
-    assert argv[-2:] == ["echo", "hi"]
+    assert argv[-1] == "echo hi"
+
+
+def test_remote_shell_command_quotes_argv() -> None:
+    assert runtime._remote_shell_command(["echo", "hello world"]) == "echo 'hello world'"
+    assert runtime._remote_shell_command(["sh", "-c", "exit 7"]) == "sh -c 'exit 7'"
+    assert runtime._remote_shell_command(['sh -c "exit 7"']) == 'sh -c "exit 7"'
+    assert runtime._remote_shell_command([]) == ""
+
+
+def test_ssh_argv_workdir(tmp_path: Path) -> None:
+    layout = _layout(tmp_path)
+    state = RunState(ssh_port=2222, gdb_port=None, pid=1, started_at="now")
+    argv = runtime._ssh_argv(
+        layout.config,
+        layout,
+        state,
+        ["echo", "hi"],
+        tty=False,
+        batch=False,
+        use_key=False,
+        workdir="/work dir",
+    )
+    assert argv[-1] == "cd '/work dir' && echo hi"
 
 
 def test_ssh_user_override_and_askpass(tmp_path: Path) -> None:

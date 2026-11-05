@@ -341,6 +341,19 @@ def _remote_command(values: list[str] | None) -> list[str]:
     return command
 
 
+def _remote_shell_command(remote: list[str]) -> str:
+    """Render remote argv as one shell command string.
+
+    A single argument is treated as an already-formed shell command. Multiple
+    arguments are treated as argv and quoted so SSH does not lose boundaries.
+    """
+    if not remote:
+        return ""
+    if len(remote) == 1:
+        return remote[0]
+    return shlex.join(remote)
+
+
 def _ssh_argv(
     config: Config,
     layout: ProjectLayout,
@@ -352,6 +365,7 @@ def _ssh_argv(
     user: str | None = None,
     use_key: bool = True,
     connect_timeout: int = 5,
+    workdir: str | None = None,
 ) -> list[str]:
     argv = [
         "ssh",
@@ -375,7 +389,15 @@ def _ssh_argv(
     if batch:
         argv += ["-o", "BatchMode=yes"]
     argv.append(f"{user or config.ssh.user}@{config.ssh.host}")
-    argv.extend(remote)
+    command = _remote_shell_command(remote)
+    if workdir:
+        command = (
+            f"cd {shlex.quote(workdir)} && {command}"
+            if command
+            else (f'cd {shlex.quote(workdir)} && exec "$SHELL" -l')
+        )
+    if command:
+        argv.append(command)
     return argv
 
 
@@ -422,6 +444,7 @@ def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
         batch=use_key,
         user=user_name,
         use_key=use_key,
+        workdir=getattr(args, "workdir", None),
     )
     if not use_key and not tty:
         askpass = _askpass_env(config, layout, user_name=user_name)

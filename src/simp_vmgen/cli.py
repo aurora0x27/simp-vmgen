@@ -307,6 +307,12 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                 metavar="NAME",
                 help="login as this configured user instead of ssh.user",
             )
+            if name == "guest":
+                p.add_argument(
+                    "--workdir",
+                    metavar="DIR",
+                    help="run the guest command in this directory",
+                )
             if name in ("ssh", "guest"):
                 p.add_argument(
                     "guest_command",

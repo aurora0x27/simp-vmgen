@@ -58,12 +58,12 @@ console:
 	@$(SIMP_VMGEN) console
 
 guest:
-	@test -n "$(CMD)" || { echo 'usage: make guest CMD="..."'; exit 2; }
-	@$(SIMP_VMGEN) guest -- $(CMD)
+	@$(if $(strip $(CMD)),,$(error usage: make guest CMD="..."))
+	@$(SIMP_VMGEN) guest -- "$$CMD"
 
 lab:
-	@test -n "$(CMD)" || { echo 'usage: make lab CMD="..."'; exit 2; }
-	@$(SIMP_VMGEN) guest -- 'cd /work && $(CMD)'
+	@$(if $(strip $(CMD)),,$(error usage: make lab CMD="..."))
+	@$(SIMP_VMGEN) guest --workdir /work -- "$$CMD"
 
 kernel-fetch:
 	@$(SIMP_VMGEN) kernel fetch

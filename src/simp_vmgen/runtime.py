@@ -349,6 +349,8 @@ def _ssh_argv(
     *,
     tty: bool,
     batch: bool,
+    user: str | None = None,
+    use_key: bool = True,
     connect_timeout: int = 5,
 ) -> list[str]:
     argv = [
@@ -366,19 +368,21 @@ def _ssh_argv(
         "-o",
         "PreferredAuthentications=publickey,password",
     ]
-    if layout.ssh_key.is_file() and layout.ssh_key.suffix != ".pub":
+    if use_key and layout.ssh_key.is_file() and layout.ssh_key.suffix != ".pub":
         argv += ["-i", str(layout.ssh_key)]
     if tty:
         argv.append("-t")
     if batch:
         argv += ["-o", "BatchMode=yes"]
-    argv.append(f"{config.ssh.user}@{config.ssh.host}")
+    argv.append(f"{user or config.ssh.user}@{config.ssh.host}")
     argv.extend(remote)
     return argv
 
 
-def _askpass_env(config: Config, layout: ProjectLayout) -> dict[str, str] | None:
-    script = askpass_script(config, layout.ssh_dir / "askpass.sh")
+def _askpass_env(
+    config: Config, layout: ProjectLayout, *, user_name: str | None = None
+) -> dict[str, str] | None:
+    script = askpass_script(config, layout.ssh_dir / "askpass.sh", user_name=user_name)
     if script is None:
         return None
     env = os.environ.copy()
@@ -404,7 +408,10 @@ def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
     remote = _remote_command(getattr(args, "guest_command", None))
     if require_command and not remote:
         raise ProjectError("a guest command is required")
+    user_name = getattr(args, "user", None) or config.ssh.user
+    target_user = config.get_user(user_name)
     has_key = layout.ssh_key.is_file() and layout.ssh_key.suffix != ".pub"
+    use_key = has_key and (user_name == config.ssh.user or bool(target_user.ssh_keys))
     env = os.environ.copy()
     argv = _ssh_argv(
         config,
@@ -412,12 +419,14 @@ def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
         state,
         remote,
         tty=tty,
-        batch=has_key,
+        batch=use_key,
+        user=user_name,
+        use_key=use_key,
     )
-    if not has_key and not tty:
-        askpass = _askpass_env(config, layout)
+    if not use_key and not tty:
+        askpass = _askpass_env(config, layout, user_name=user_name)
         if askpass is None:
-            raise ProjectError("no SSH key or password is available for a non-interactive command")
+            raise ProjectError(f"no SSH key or password is available for user {user_name!r}")
         env = askpass
         argv = _with_setsid(argv)
 

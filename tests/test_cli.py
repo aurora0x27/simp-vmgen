@@ -53,6 +53,13 @@ def test_kernel_subcommands_are_registered() -> None:
         assert args.kernel_command == name
 
 
+def test_ssh_user_option() -> None:
+    parser = build_parser()
+    assert parser.parse_args(["ssh", "--user", "alice"]).user == "alice"
+    assert parser.parse_args(["tty", "-u", "alice"]).user == "alice"
+    assert parser.parse_args(["guest", "--user", "alice", "--", "true"]).user == "alice"
+
+
 @pytest.mark.parametrize(
     ("shell", "marker"),
     [

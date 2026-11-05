@@ -300,13 +300,20 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
             _add_local_dry_run(p)
         elif name == "wait":
             p.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
-        elif name in ("ssh", "guest"):
+        elif name in ("ssh", "tty", "guest"):
             p.add_argument(
-                "guest_command",
-                nargs=argparse.REMAINDER,
-                metavar="CMD",
-                help="command to run (use -- before CMD)",
+                "-u",
+                "--user",
+                metavar="NAME",
+                help="login as this configured user instead of ssh.user",
             )
+            if name in ("ssh", "guest"):
+                p.add_argument(
+                    "guest_command",
+                    nargs=argparse.REMAINDER,
+                    metavar="CMD",
+                    help="command to run (use -- before CMD)",
+                )
         elif name == "log":
             p.add_argument("-f", "--follow", action="store_true", help="follow the log")
         elif name == "clean":

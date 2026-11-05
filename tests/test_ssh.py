@@ -9,7 +9,7 @@ import pytest
 
 from simp_vmgen import runtime
 from simp_vmgen.cli import main
-from simp_vmgen.config import Config
+from simp_vmgen.config import Config, UserConfig
 from simp_vmgen.errors import ProjectError
 from simp_vmgen.layout import ProjectLayout
 from simp_vmgen.sshkeys import askpass_script, ensure_ssh_key
@@ -62,6 +62,31 @@ def test_ssh_argv(tmp_path: Path) -> None:
     assert "BatchMode=yes" in argv
     assert "root@127.0.0.1" in argv
     assert argv[-2:] == ["echo", "hi"]
+
+
+def test_ssh_user_override_and_askpass(tmp_path: Path) -> None:
+    config = Config.default("lab")
+    config.users.append(UserConfig("alice", password="alice-secret"))
+    config.validate()
+    layout = ProjectLayout(tmp_path, config)
+    state = RunState(ssh_port=2222, gdb_port=None, pid=1, started_at="now")
+
+    argv = runtime._ssh_argv(
+        config,
+        layout,
+        state,
+        [],
+        tty=False,
+        batch=False,
+        user="alice",
+        use_key=False,
+    )
+    assert "alice@127.0.0.1" in argv
+    assert "-i" not in argv
+
+    env = runtime._askpass_env(config, layout, user_name="alice")
+    assert env is not None
+    assert "alice-secret" in Path(env["SSH_ASKPASS"]).read_text()
 
 
 def test_remote_command_strips_separator() -> None:

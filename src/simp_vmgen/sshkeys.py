@@ -65,8 +65,8 @@ def ensure_ssh_key(config: Config, key_path: Path) -> SshKey | None:
     return SshKey(key_path, public_key)
 
 
-def askpass_script(config: Config, path: Path) -> Path | None:
-    password = config.login_user.password
+def askpass_script(config: Config, path: Path, *, user_name: str | None = None) -> Path | None:
+    password = config.get_user(user_name).password if user_name else config.login_user.password
     if not password:
         return None
     path.parent.mkdir(parents=True, exist_ok=True)

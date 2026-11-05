@@ -143,6 +143,14 @@ ssh_keys = ["ssh-ed25519 AAAA..."]
 non-root user for a non-root default login; root login can also be disabled
 with `permit_root_login = false` (then `ssh.user` must not be `root`).
 
+To log in as another configured user for one command:
+
+```sh
+simp-vmgen ssh --user alice
+simp-vmgen tty --user alice
+simp-vmgen guest --user alice -- id
+```
+
 ## Volumes
 
 Docker-style volumes may be added when creating a project or edited in

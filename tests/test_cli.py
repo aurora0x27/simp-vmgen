@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from simp_vmgen import __version__
-from simp_vmgen.cli import EXIT_OK, build_parser, main
+from simp_vmgen.cli import EXIT_OK, EXIT_USAGE, build_parser, main
 
 
 def test_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -81,3 +83,28 @@ def test_new_volume_options() -> None:
     args = parser.parse_args(["new", "lab", "-v", "work:/work", "-v", "/src:/src:ro"])
     assert args.directory == "lab"
     assert args.volume == ["work:/work", "/src:/src:ro"]
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["-n", "stop"],
+        ["-n", "clean"],
+        ["-n", "status"],
+        ["-n", "ssh"],
+        ["-n", "regen"],
+        ["-n", "kernel", "status"],
+        ["-n", "kernel", "clean"],
+    ],
+)
+def test_dry_run_rejects_unsupported_commands(
+    argv: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(argv) == EXIT_USAGE
+    assert "--dry-run is not supported" in capsys.readouterr().err
+
+
+def test_dry_run_supported_build(tmp_path: Path) -> None:
+    root = tmp_path / "lab"
+    assert main(["new", str(root)]) == 0
+    assert main(["-C", str(root), "-n", "build"]) == 0

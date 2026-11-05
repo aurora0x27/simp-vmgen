@@ -33,6 +33,21 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
 
+_DRY_RUN_COMMANDS = {"new", "build", "run"}
+_DRY_RUN_KERNEL_COMMANDS = {"fetch", "config", "build", "rootfs", "initramfs"}
+
+
+def _dry_run_supported(args: argparse.Namespace) -> bool:
+    if args.command == "kernel":
+        return getattr(args, "kernel_command", None) in _DRY_RUN_KERNEL_COMMANDS
+    return args.command in _DRY_RUN_COMMANDS
+
+
+def _command_label(args: argparse.Namespace) -> str:
+    if args.command == "kernel" and getattr(args, "kernel_command", None):
+        return f"kernel {args.kernel_command}"
+    return str(args.command)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -69,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-n",
         "--dry-run",
         action="store_true",
-        help="print what would happen without changing anything",
+        help="print what would happen without changing anything (where supported)",
     )
 
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
@@ -381,6 +396,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return EXIT_OK
+
+    if getattr(args, "dry_run", False) and not _dry_run_supported(args):
+        print(
+            f"{PROG}: --dry-run is not supported for {_command_label(args)!r}",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
 
     handlers = {
         "new": new_project,

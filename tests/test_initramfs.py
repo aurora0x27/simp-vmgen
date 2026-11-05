@@ -116,3 +116,34 @@ def test_initramfs_none_rootfs(tmp_path: Path) -> None:
 
     with pytest.raises(ProjectError, match="rootfs"):
         build_initramfs(config, layout)
+
+
+def test_kernel_initramfs_records_stamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from simp_vmgen import initramfs as initramfs_module
+    from simp_vmgen import stamp
+
+    config = Config.default("lab")
+    config.kernel = KernelConfig(enabled=True, version="6.1.0")
+    config.validate()
+    config.save(tmp_path / "vmgen.toml")
+    layout = ProjectLayout(tmp_path, config)
+    output = layout.kernel_dir / "initramfs.cpio.gz"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"initramfs")
+
+    monkeypatch.setattr(
+        initramfs_module,
+        "build_initramfs",
+        lambda *args, **kwargs: output,
+    )
+    assert (
+        initramfs_module.kernel_initramfs(
+            SimpleNamespace(directory=str(tmp_path), force=False, dry_run=False)
+        )
+        == 0
+    )
+    recorded = stamp.load(layout)
+    assert recorded is not None
+    assert recorded["kernel"]["initrd"]["path"] == str(output.resolve())

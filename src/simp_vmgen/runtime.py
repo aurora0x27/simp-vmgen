@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from . import stamp
 from .attach import attach_socket, show_log
 from .cache import download, images_dir
 from .config import LOCK_FILENAME, Config
@@ -121,6 +122,17 @@ def build(args: Any) -> int:
         lock.image_checksum = checksum
     lock.save(root / LOCK_FILENAME)
 
+    stamp.validate_cloud_build(
+        config,
+        layout,
+        base=base,
+        image_url=lock.image_url,
+        image_filename=lock.image_filename,
+        image_checksum=checksum or lock.image_checksum,
+        force=getattr(args, "force", False),
+    )
+    if getattr(args, "force", False) and layout.overlay.is_file():
+        print("warning: recreating overlay; guest data will be lost", file=sys.stderr)
     if getattr(args, "force", False) or not layout.overlay.is_file():
         _create_overlay(layout, base, release)
 
@@ -131,6 +143,15 @@ def build(args: Any) -> int:
         root,
         layout.run_dir,
         generated_public_key=key.public_key if key is not None else "",
+    )
+    stamp.save_cloud(
+        config,
+        layout,
+        base=base,
+        image_url=lock.image_url,
+        image_filename=lock.image_filename,
+        image_checksum=checksum or lock.image_checksum,
+        seed_instance_id=seed.instance_id,
     )
     print(f"base image : {base}")
     print(f"overlay    : {layout.overlay}")
@@ -222,10 +243,11 @@ def run(args: Any) -> int:
     if running_pid(layout) is not None:
         raise ProjectError("the VM is already running; run `simp-vmgen stop` first")
     if config.kernel.enabled:
-        kernel_image_path(config, layout)
-        kernel_initrd_path(config, layout)
-    elif not layout.overlay.is_file() or not layout.seed_iso.is_file():
-        raise ProjectError("VM artifacts are missing; run `simp-vmgen build` first")
+        image = kernel_image_path(config, layout)
+        initrd = kernel_initrd_path(config, layout)
+        stamp.require_kernel_artifacts(config, layout, image, initrd)
+    else:
+        stamp.require_cloud_artifacts(config, layout)
 
     ssh_port = resolve_port(config.ssh.host, config.ssh.port, start=2222)
     gdb_port = None

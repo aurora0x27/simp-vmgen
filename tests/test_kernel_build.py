@@ -59,6 +59,12 @@ def test_kernel_build_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert kernel.kernel_build(SimpleNamespace(directory=str(tmp_path), dry_run=False)) == 0
     assert (layout.kernel_dir / "build" / "arch/x86/boot/bzImage").is_file()
     assert (layout.kernel_dir / "modules" / "marker").is_file()
+    from simp_vmgen import stamp
+
+    recorded = stamp.load(layout)
+    assert recorded is not None
+    assert recorded["mode"] == "kernel"
+    assert recorded["kernel"]["image"]["path"].endswith("arch/x86/boot/bzImage")
 
 
 def test_kernel_build_dry_run(
@@ -94,3 +100,33 @@ def test_kernel_clean(tmp_path: Path) -> None:
     (layout.kernel_dir / "build" / "marker").write_text("x")
     assert kernel.kernel_clean(SimpleNamespace(directory=str(tmp_path))) == 0
     assert not (layout.kernel_dir / "build").exists()
+
+
+def test_ensure_kernel_artifacts_rebuilds_without_fresh_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path, ["bzImage"])
+    layout = ProjectLayout(tmp_path, config)
+    image = layout.kernel_dir / "build" / "arch/x86/boot/bzImage"
+    initrd = layout.kernel_dir / "initramfs.cpio.gz"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"old")
+    initrd.parent.mkdir(parents=True, exist_ok=True)
+    initrd.write_bytes(b"initrd")
+    calls: list[str] = []
+
+    def fake_build_kernel(*args: object, **kwargs: object) -> Path:
+        calls.append("image")
+        image.write_bytes(b"new")
+        return image
+
+    monkeypatch.setattr(kernel, "build_kernel", fake_build_kernel)
+    monkeypatch.setattr(kernel, "build_initramfs", lambda *args, **kwargs: initrd)
+
+    artifacts = kernel.ensure_kernel_artifacts(config, tmp_path, layout)
+    assert artifacts.image == image
+    assert calls == ["image"]
+
+    artifacts = kernel.ensure_kernel_artifacts(config, tmp_path, layout)
+    assert artifacts.image == image
+    assert calls == ["image"]

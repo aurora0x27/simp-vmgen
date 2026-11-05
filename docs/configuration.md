@@ -188,6 +188,7 @@ Commit it to preserve reproducibility.
 ```text
 .simp-vmgen/
 ├── generated.json          # generated-file hashes for regen
+├── build.json              # config hash and artifact metadata
 ├── run/                    # pid, sockets, logs, overlay, seed
 ├── ssh/                    # generated SSH key
 └── kernel/
@@ -197,3 +198,8 @@ Commit it to preserve reproducibility.
     ├── initramfs/          # unpacked busybox rootfs
     └── initramfs.cpio.gz
 ```
+
+`build.json` records the configuration used to build the runtime artifacts.
+`run` refuses artifacts that do not match the current `vmgen.toml`; run
+`build` to refresh them. Changing `vm.disk` or the base image requires
+`build --force`, which recreates the overlay and discards guest state.

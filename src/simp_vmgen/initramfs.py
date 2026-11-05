@@ -13,7 +13,7 @@ from typing import Any
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
-from . import __version__
+from . import __version__, stamp
 from .alpine import prepare_alpine_rootfs
 from .cache import cache_dir, download
 from .config import Config
@@ -223,5 +223,6 @@ def kernel_initramfs(args: Any) -> int:
     if getattr(args, "dry_run", False):
         print(f"would create {output}")
     else:
+        stamp.record_kernel_initrd(config, layout, output)
         print(f"initramfs: {output}")
     return 0

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import stamp
 from .alpine import prepare_alpine_rootfs
 from .config import LOCK_FILENAME, Config
 from .distros import load_distro
@@ -226,7 +227,10 @@ def build_kernel(
             "modules_install",
             extra_args=[f"INSTALL_MOD_PATH={modules_dir}"],
         )
-    return built_image_path(config, layout)
+    image = built_image_path(config, layout)
+    if not dry_run and image is not None and image.is_file():
+        stamp.record_kernel_image(config, layout, image)
+    return image
 
 
 def kernel_image_path(config: Config, layout: ProjectLayout) -> Path:
@@ -258,6 +262,12 @@ def ensure_kernel_artifacts(
 ) -> KernelArtifacts:
     if not config.kernel.enabled:
         raise ProjectError("kernel support is not enabled in vmgen.toml")
+    previous = stamp.load(layout)
+    kernel_stale = not (
+        previous is not None
+        and previous.get("mode") == "kernel"
+        and previous.get("config_hash") == stamp.config_digest(config)
+    )
     image: Path | None
     if config.kernel.mode == "artifact":
         info = resolve_source(config, root, layout, dry_run=dry_run)
@@ -266,7 +276,7 @@ def ensure_kernel_artifacts(
             _update_kernel_lock(root, config, info)
     else:
         image = built_image_path(config, layout)
-        if image is None or not image.is_file():
+        if kernel_stale or image is None or not image.is_file():
             image = build_kernel(config, root, layout, dry_run=dry_run) or image
         if image is None:
             if dry_run:
@@ -277,6 +287,9 @@ def ensure_kernel_artifacts(
         initrd = kernel_initrd_path(config, layout)
     else:
         initrd = build_initramfs(config, layout, dry_run=dry_run)
+    if not dry_run and image is not None:
+        stamp.record_kernel_image(config, layout, image)
+        stamp.record_kernel_initrd(config, layout, initrd)
     return KernelArtifacts(image=image, initrd=initrd)
 
 

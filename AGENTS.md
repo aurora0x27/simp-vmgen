@@ -73,6 +73,7 @@ src/simp_vmgen/
 ├── net.py            free-port allocation
 ├── layout.py         `.simp-vmgen/` paths
 ├── state.py          allocated ports and running PID
+├── stamp.py          build stamps for stale artifact detection
 ├── qemu.py           QEMU argv construction
 ├── runtime.py        build/run/stop/status/ssh/wait/serial/console/log/clean
 ├── attach.py         serial/monitor socket proxy and log tailing
@@ -155,6 +156,10 @@ The generated `Makefile` only forwards to `simp-vmgen`; keep it that way.
 
 - Build artifacts live under `.simp-vmgen/run/` (cloud image) and
   `.simp-vmgen/kernel/` (kernel).
+- `.simp-vmgen/build.json` records the config hash and artifact metadata.
+  `run` refuses artifacts built from a different configuration; `build` refreshes
+  them. Changing `vm.disk` or the base image requires `build --force` because it
+  recreates the overlay and discards guest state.
 - Port allocation happens at `run` time; fixed ports fail if busy, `"auto"`
   finds a free port.
 - QEMU runs daemonized by default; foreground mode saves state too.

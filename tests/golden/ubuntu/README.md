@@ -10,6 +10,11 @@ make regen          # update generated files
 make regen-check    # report drift without writing
 ```
 
+`make regen` only updates the generated files. After changing runtime settings
+(users, packages, mounts, VM resources or kernel options), run `make build` to
+refresh the seed/overlay, or the relevant `make kernel-*` target. `run` refuses
+artifacts that were built from an older configuration.
+
 `vmgen.lock` pins the base image URL and checksum. Generated file hashes are
 tracked in `.simp-vmgen/generated.json`; `regen` preserves local edits unless
 you pass `--force`.

@@ -9,3 +9,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Local agent scratch/context (per-worktree, not shared)
+.agent/

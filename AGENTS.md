@@ -256,6 +256,18 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 - Keep the generated project self-documenting: update
   `templates/README.md.j2` when behavior changes.
 
+## Agent scratch space
+
+- `.agent/` is a gitignored local scratch directory for agent notes, audits,
+  plans and handoff context. It is not part of the project.
+- Multiple agents working in the same checkout share the same `.agent/`.
+  Each git worktree gets its own `.agent/`; do not assume it is shared across
+  worktrees.
+- Keep durable decisions and user-facing documentation in `AGENTS.md`,
+  `README.md` or `docs/`, not only in `.agent/`.
+- Do not put credentials or private keys in `.agent/`; ignored files are not
+  secure by definition.
+
 ## Common pitfalls
 
 - Cloud-init seed changes alter the computed `instance-id`; rebuild the seed.
@@ -271,6 +283,7 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 
 ## Current state
 
-M1–M5 of the original plan are implemented. There is no active TODO file; treat
-this document, the README, `docs/configuration.md`, and the tests as the
-maintained source of truth.
+M1–M5 of the original plan are implemented. There is no tracked TODO file;
+agent scratch context lives in `.agent/` (gitignored). Treat this document, the
+README, `docs/configuration.md`, and the tests as the maintained source of
+truth.

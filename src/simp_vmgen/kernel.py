@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,6 +21,7 @@ from .paths import load_project
 from .rootfs import load_rootfs
 from .rootfs_source import fetch_rootfs
 from .rootfs_source import update_lock as update_rootfs_lock
+from .runner import run_streaming
 from .sshkeys import ensure_ssh_key
 
 
@@ -70,6 +70,7 @@ def _run_make(
     *,
     dry_run: bool = False,
     extra_args: list[str] | None = None,
+    log_path: Path | None = None,
 ) -> None:
     make = shutil.which("make")
     if make is None:
@@ -89,14 +90,11 @@ def _run_make(
     if dry_run:
         print("+", " ".join(argv))
         return
-    try:
-        result = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=None)
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise ProjectError(f"make {target} failed: {exc}") from exc
+    result = run_streaming(argv, log_path=log_path, what=f"make {target}")
     if result.returncode != 0:
-        output = (result.stderr or result.stdout).strip().splitlines()
-        detail = "\n".join(output[-30:])
-        raise ProjectError(f"make {target} failed:\n{detail}")
+        suffix = f" (log: {log_path})" if log_path is not None else ""
+        detail = "\n".join(result.tail)
+        raise ProjectError(f"make {target} failed{suffix}:\n{detail}")
 
 
 def _kernel_config_file(config: Config, root: Path) -> tuple[Path | None, str]:
@@ -138,7 +136,13 @@ def configure_kernel(
     if base_path is not None:
         shutil.copyfile(base_path, config_file)
     else:
-        _run_make(source, build, config, target)
+        _run_make(
+            source,
+            build,
+            config,
+            target,
+            log_path=layout.logs_dir / "kernel-config.log",
+        )
 
     with config_file.open("a", encoding="utf-8") as handle:
         handle.write("\n# simp-vmgen VM defaults\n")
@@ -156,7 +160,13 @@ def configure_kernel(
         for name, value in sorted(config.kernel.options.items()):
             handle.write(f"{name}={value}\n")
 
-    _run_make(source, build, config, "olddefconfig")
+    _run_make(
+        source,
+        build,
+        config,
+        "olddefconfig",
+        log_path=layout.logs_dir / "kernel-config.log",
+    )
     return config_file
 
 
@@ -216,7 +226,14 @@ def build_kernel(
     if not dry_run and not (build / ".config").is_file():
         configure_kernel(config, root, info.path, layout)
     for target in config.kernel.targets:
-        _run_make(info.path, build, config, target, dry_run=dry_run)
+        _run_make(
+            info.path,
+            build,
+            config,
+            target,
+            dry_run=dry_run,
+            log_path=layout.logs_dir / "kernel-build.log",
+        )
     if "modules" in config.kernel.targets and not dry_run:
         modules_dir = layout.kernel_dir / "modules"
         modules_dir.mkdir(parents=True, exist_ok=True)
@@ -226,6 +243,7 @@ def build_kernel(
             config,
             "modules_install",
             extra_args=[f"INSTALL_MOD_PATH={modules_dir}"],
+            log_path=layout.logs_dir / "kernel-build.log",
         )
     image = built_image_path(config, layout)
     if not dry_run and image is not None and image.is_file():

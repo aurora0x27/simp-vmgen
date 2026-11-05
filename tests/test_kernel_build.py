@@ -7,6 +7,7 @@ import pytest
 
 from simp_vmgen import kernel
 from simp_vmgen.config import Config, KernelConfig
+from simp_vmgen.errors import ProjectError
 from simp_vmgen.kernel_source import KernelSourceInfo
 from simp_vmgen.layout import ProjectLayout
 
@@ -130,3 +131,31 @@ def test_ensure_kernel_artifacts_rebuilds_without_fresh_stamp(
     artifacts = kernel.ensure_kernel_artifacts(config, tmp_path, layout)
     assert artifacts.image == image
     assert calls == ["image"]
+
+
+def test_kernel_build_failure_reports_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "linux"
+    source.mkdir()
+    (source / "Makefile").write_text(
+        "O ?= .\n"
+        "defconfig:\n"
+        "\tmkdir -p $(O)\n"
+        "\tprintf 'CONFIG_BASE=y\\n' > $(O)/.config\n"
+        "olddefconfig:\n"
+        "\ttrue\n"
+        "bzImage:\n"
+        "\t@echo boom\n"
+        "\t@exit 1\n"
+    )
+    config = _config(tmp_path, ["bzImage"])
+    layout = ProjectLayout(tmp_path, config)
+    monkeypatch.setattr(
+        kernel,
+        "resolve_source",
+        lambda *args, **kwargs: KernelSourceInfo(mode="tarball", path=source, version="6.1.0"),
+    )
+    with pytest.raises(ProjectError, match="kernel-build.log"):
+        kernel.kernel_build(SimpleNamespace(directory=str(tmp_path), dry_run=False))
+    log = layout.logs_dir / "kernel-build.log"
+    assert log.is_file()
+    assert "boom" in log.read_text(encoding="utf-8")

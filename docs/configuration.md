@@ -191,6 +191,7 @@ Commit it to preserve reproducibility.
 ├── build.json              # config hash and artifact metadata
 ├── run/                    # pid, sockets, logs, overlay, seed
 ├── ssh/                    # generated SSH key
+├── logs/                   # build, download and provisioning logs
 └── kernel/
     ├── src/                # kernel source or git tree
     ├── build/              # out-of-tree kernel build

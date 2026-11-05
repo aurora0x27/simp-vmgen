@@ -76,6 +76,7 @@ src/simp_vmgen/
 ├── stamp.py          build stamps for stale artifact detection
 ├── qemu.py           QEMU argv construction
 ├── runtime.py        build/run/stop/status/ssh/wait/serial/console/log/clean
+├── runner.py         streaming subprocesses and persistent build logs
 ├── attach.py         serial/monitor socket proxy and log tailing
 ├── kernel_source.py  tarball/git source acquisition
 ├── kernel.py         Kconfig, build, artifact resolution, kernel status
@@ -160,6 +161,9 @@ The generated `Makefile` only forwards to `simp-vmgen`; keep it that way.
   `run` refuses artifacts built from a different configuration; `build` refreshes
   them. Changing `vm.disk` or the base image requires `build --force` because it
   recreates the overlay and discards guest state.
+- Long-running commands stream their output and append it to files under
+  `.simp-vmgen/logs/` (kernel build/config/source, Alpine packages). Failures
+  include the log path.
 - Port allocation happens at `run` time; fixed ports fail if busy, `"auto"`
   finds a free port.
 - QEMU runs daemonized by default; foreground mode saves state too.

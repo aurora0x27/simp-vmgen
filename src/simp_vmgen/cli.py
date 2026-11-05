@@ -13,6 +13,7 @@ from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .kernel import kernel_dispatch
 from .project import new_project, regen_project, show_project
+from .runner import set_verbose
 from .runtime import build as runtime_build
 from .runtime import clean as runtime_clean
 from .runtime import console as runtime_console
@@ -392,6 +393,7 @@ def print_completion(args: argparse.Namespace) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    set_verbose(bool(getattr(args, "verbose", False)))
 
     if args.command is None:
         parser.print_help()

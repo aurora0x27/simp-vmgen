@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -13,6 +12,7 @@ from .config import Config
 from .errors import ProjectError
 from .layout import ProjectLayout
 from .lock import KernelLock, Lock
+from .runner import run_streaming
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,30 +36,41 @@ def kernel_checksum_url(version: str) -> str:
     return f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/sha256sums.asc"
 
 
-def _run(argv: list[str], what: str, *, cwd: Path | None = None) -> str:
-    try:
-        result = subprocess.run(
-            argv,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=3600,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise ProjectError(f"{what} failed: {exc}") from exc
+def _run(
+    argv: list[str],
+    what: str,
+    *,
+    cwd: Path | None = None,
+    log_path: Path | None = None,
+    capture: bool = False,
+    echo: bool = True,
+) -> str:
+    result = run_streaming(
+        argv,
+        cwd=cwd,
+        log_path=log_path,
+        timeout=3600,
+        echo=echo,
+        capture=capture,
+        what=what,
+    )
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
-        raise ProjectError(f"{what} failed: {detail}")
-    return result.stdout.strip()
+        suffix = f" (log: {log_path})" if log_path is not None else ""
+        detail = (result.stdout or "\n".join(result.tail)).strip()
+        raise ProjectError(f"{what} failed{suffix}:\n{detail}")
+    return result.stdout.strip() if capture else ""
 
 
-def _extract_tarball(tarball: Path, destination: Path) -> Path:
+def _extract_tarball(tarball: Path, destination: Path, *, log_path: Path | None = None) -> Path:
     destination.mkdir(parents=True, exist_ok=True)
     tar = shutil.which("tar")
     if tar is None:
         raise ProjectError("tar not found")
-    _run([tar, "-xf", str(tarball), "-C", str(destination)], "cannot extract kernel source")
+    _run(
+        [tar, "-xf", str(tarball), "-C", str(destination)],
+        "cannot extract kernel source",
+        log_path=log_path,
+    )
     entries = [entry for entry in destination.iterdir() if entry.is_dir()]
     if len(entries) == 1:
         return entries[0]
@@ -96,7 +107,11 @@ def _fetch_tarball(config: Config, layout: ProjectLayout, *, dry_run: bool) -> K
             checksum_url=checksum_url,
             directory=kernel_sources_dir(),
         )
-        tree = _extract_tarball(tarball, destination)
+        tree = _extract_tarball(
+            tarball,
+            destination,
+            log_path=layout.logs_dir / "kernel-source.log",
+        )
     else:
         checksum = kernel.source_checksum
     return KernelSourceInfo(
@@ -108,18 +123,24 @@ def _fetch_tarball(config: Config, layout: ProjectLayout, *, dry_run: bool) -> K
     )
 
 
-def _git_fetch(config: Config, tree: Path) -> str:
+def _git_fetch(config: Config, tree: Path, *, log_path: Path | None = None) -> str:
     kernel = config.kernel
     git = shutil.which("git")
     if git is None:
         raise ProjectError("git not found")
     if not tree.is_dir():
         tree.mkdir(parents=True)
-        _run([git, "init", "-q"], "cannot initialize kernel git tree", cwd=tree)
+        _run(
+            [git, "init", "-q"],
+            "cannot initialize kernel git tree",
+            cwd=tree,
+            log_path=log_path,
+        )
         _run(
             [git, "remote", "add", "origin", kernel.repo],
             "cannot add kernel git remote",
             cwd=tree,
+            log_path=log_path,
         )
 
     try:
@@ -127,25 +148,36 @@ def _git_fetch(config: Config, tree: Path) -> str:
             [git, "fetch", "--depth=1", "origin", kernel.commit],
             "cannot fetch kernel commit",
             cwd=tree,
+            log_path=log_path,
         )
     except ProjectError:
         _run(
             [git, "fetch", "origin"],
             "cannot fetch kernel repository",
             cwd=tree,
+            log_path=log_path,
         )
         _run(
             [git, "checkout", "--detach", kernel.commit],
             "cannot check out kernel commit",
             cwd=tree,
+            log_path=log_path,
         )
     else:
         _run(
             [git, "checkout", "--detach", "FETCH_HEAD"],
             "cannot check out kernel commit",
             cwd=tree,
+            log_path=log_path,
         )
-    return _run([git, "rev-parse", "HEAD"], "cannot resolve kernel commit", cwd=tree)
+    return _run(
+        [git, "rev-parse", "HEAD"],
+        "cannot resolve kernel commit",
+        cwd=tree,
+        log_path=log_path,
+        capture=True,
+        echo=False,
+    )
 
 
 def _fetch_git(config: Config, layout: ProjectLayout, *, dry_run: bool) -> KernelSourceInfo:
@@ -157,7 +189,11 @@ def _fetch_git(config: Config, layout: ProjectLayout, *, dry_run: bool) -> Kerne
             repo=config.kernel.repo,
             commit=config.kernel.commit,
         )
-    commit = _git_fetch(config, tree)
+    commit = _git_fetch(
+        config,
+        tree,
+        log_path=layout.logs_dir / "kernel-source.log",
+    )
     return KernelSourceInfo(
         mode="git",
         path=tree,

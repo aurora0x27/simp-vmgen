@@ -21,6 +21,7 @@ from .layout import ProjectLayout
 from .mounts import resolve_mounts
 from .rootfs import RootfsSpec, load_rootfs
 from .rootfs_source import RootfsSourceInfo, fetch_rootfs
+from .runner import run_streaming
 from .seed import READY_MARKER
 from .users import ProvisionUser, provision_users
 
@@ -47,14 +48,12 @@ def _write(path: Path, content: str, *, mode: int = 0o644) -> None:
     os.replace(tmp, path)
 
 
-def _run(argv: list[str], what: str) -> None:
-    try:
-        result = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=900)
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise ProjectError(f"{what} failed: {exc}") from exc
+def _run(argv: list[str], what: str, *, log_path: Path | None = None) -> None:
+    result = run_streaming(argv, log_path=log_path, timeout=900, what=what)
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip().splitlines()
-        raise ProjectError(f"{what} failed:\n" + "\n".join(detail[-30:]))
+        suffix = f" (log: {log_path})" if log_path is not None else ""
+        detail = (result.stdout or "\n".join(result.tail)).strip()
+        raise ProjectError(f"{what} failed{suffix}:\n{detail}")
 
 
 def ensure_apk_tools(spec: RootfsSpec) -> Path:
@@ -82,7 +81,12 @@ def ensure_apk_tools(spec: RootfsSpec) -> Path:
 
 
 def install_packages(
-    spec: RootfsSpec, rootfs: Path, packages: list[str], *, dry_run: bool = False
+    spec: RootfsSpec,
+    rootfs: Path,
+    packages: list[str],
+    *,
+    dry_run: bool = False,
+    log_path: Path | None = None,
 ) -> None:
     packages = list(dict.fromkeys(packages))
     if not packages:
@@ -107,7 +111,7 @@ def install_packages(
     if dry_run:
         print("+", " ".join(shlex.quote(item) for item in argv))
         return
-    _run(argv, "cannot install Alpine packages")
+    _run(argv, "cannot install Alpine packages", log_path=log_path)
 
 
 def _password_hash(password: str) -> str:
@@ -363,7 +367,12 @@ def prepare_alpine_rootfs(
     users = provision_users(config, distro, root, generated_public_key=generated_public_key)
     packages = distro.packages(config.provision.package_sets, config.provision.extra_packages)
     packages.extend(spec.packages)
-    install_packages(spec, info.root_dir, packages)
+    install_packages(
+        spec,
+        info.root_dir,
+        packages,
+        log_path=layout.logs_dir / "alpine-packages.log",
+    )
     ssh_pwauth = any(user.password for user in users)
     _prepare_users(config, distro, info.root_dir, users)
     _write_ssh_config(config, info.root_dir, ssh_pwauth=ssh_pwauth)

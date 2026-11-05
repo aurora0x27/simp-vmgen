@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -139,9 +139,37 @@ def _download_to(url: str, target: Path) -> None:
 
     status = getattr(response, "status", response.getcode())
     mode = "ab" if existing and status == 206 else "wb"
+    length = response.headers.get("Content-Length") if response.headers else None
+    total = existing + int(length) if length and length.isdigit() else None
+    written = existing if mode == "ab" else 0
+    last_report = written
     try:
         with target.open(mode) as handle:
-            shutil.copyfileobj(response, handle, _CHUNK_SIZE)
+            while True:
+                chunk = response.read(_CHUNK_SIZE)
+                if not chunk:
+                    break
+                handle.write(chunk)
+                written += len(chunk)
+                if total:
+                    if sys.stderr.isatty():
+                        percent = min(100, written * 100 // total)
+                        print(
+                            f"\rdownload {percent:3d}% "
+                            f"({written // (1024 * 1024)}/{total // (1024 * 1024)} MiB)",
+                            end="",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                    elif written - last_report >= 10 * 1024 * 1024:
+                        print(
+                            f"download {written // (1024 * 1024)} / {total // (1024 * 1024)} MiB",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                        last_report = written
+        if total and sys.stderr.isatty():
+            print(file=sys.stderr)
     finally:
         response.close()
 

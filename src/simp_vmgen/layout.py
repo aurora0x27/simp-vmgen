@@ -34,6 +34,10 @@ class ProjectLayout:
         return self.runtime_dir / "kernel"
 
     @property
+    def logs_dir(self) -> Path:
+        return self.runtime_dir / "logs"
+
+    @property
     def overlay(self) -> Path:
         return self.run_dir / "overlay.qcow2"
 
@@ -85,4 +89,5 @@ class ProjectLayout:
     def ensure(self) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.ssh_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.socket_dir.mkdir(parents=True, exist_ok=True)

@@ -303,7 +303,14 @@ class Config:
             data = tomllib.loads(text)
         except tomllib.TOMLDecodeError as exc:
             raise ConfigError(f"{source}: invalid TOML: {exc}") from exc
-        return cls.from_dict(data, source=source)
+        try:
+            return cls.from_dict(data, source=source)
+        except ConfigError as exc:
+            message = str(exc)
+            prefix = f"{source}."
+            if message.startswith(prefix):
+                message = f"{Path(source).name}: {message[len(prefix) :]}"
+            raise ConfigError(message) from exc
 
     @classmethod
     def from_dict(cls, data: dict[str, Any], *, source: str = "vmgen.toml") -> Config:

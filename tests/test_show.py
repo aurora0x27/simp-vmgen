@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from simp_vmgen.cli import main
+from simp_vmgen.config import Config
 
 
 def _project(tmp_path: Path) -> Path:
@@ -43,6 +44,16 @@ def test_show_json_redacts_passwords(tmp_path: Path, capsys) -> None:
     assert main(["-C", str(root), "show", "--json", "--show-secrets"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["config"]["users"][0]["password"] == "114514"
+
+
+def test_show_rejects_unknown_distro(tmp_path: Path, capsys) -> None:
+    root = _project(tmp_path)
+    config = Config.load(root / "vmgen.toml")
+    config.distro.name = "debian"
+    config.save(root / "vmgen.toml")
+
+    assert main(["-C", str(root), "show"]) == 1
+    assert "unknown distro" in capsys.readouterr().err
 
 
 def test_generated_readme_and_gitignore(tmp_path: Path) -> None:

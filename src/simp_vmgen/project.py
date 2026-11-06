@@ -315,6 +315,8 @@ def regen_project(args: argparse.Namespace) -> int:
 
 def show_project(args: argparse.Namespace) -> int:
     root, config = load_project(args.directory)
+    distro = load_distro(config.distro.name)
+    distro.release(config.distro.release)
     layout = ProjectLayout(root, config)
     lock_path = root / LOCK_FILENAME
     lock = Lock.load(lock_path) if lock_path.is_file() else None

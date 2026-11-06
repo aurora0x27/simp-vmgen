@@ -252,6 +252,21 @@ def test_validation_errors(text: str, message: str) -> None:
         Config.loads(text)
 
 
+def test_error_location_is_readable() -> None:
+    text = """
+schema = 1
+[project]
+name = "lab"
+[distro]
+name = "ubuntu"
+release = "24.04"
+[kernel]
+bogus = 1
+"""
+    with pytest.raises(ConfigError, match=r"^vmgen\.toml: kernel: unknown key"):
+        Config.loads(text)
+
+
 def test_root_login_cannot_be_disabled_for_root_user() -> None:
     config = Config.default("lab")
     config.ssh.permit_root_login = False

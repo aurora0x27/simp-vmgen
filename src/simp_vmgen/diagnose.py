@@ -15,7 +15,8 @@ from typing import Any
 
 from .cache import cache_dir
 from .config import Config
-from .errors import ProjectError
+from .distros import load_distro
+from .errors import ProjectError, SimpVmgenError
 from .paths import load_project
 from .rootfs import load_rootfs
 
@@ -276,6 +277,20 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
         selected = "base"
 
     checks: list[CheckResult] = [_check_python()]
+    if config is not None:
+        try:
+            distro = load_distro(config.distro.name)
+            release = distro.release(config.distro.release)
+        except SimpVmgenError as exc:
+            checks.append(CheckResult("distro", "missing", detail=str(exc)))
+        else:
+            checks.append(
+                CheckResult(
+                    "distro",
+                    "ok",
+                    detail=f"{distro.name} {release.version}",
+                )
+            )
     checks.append(_check_tool(f"qemu-system-{arch}", version_args=("--version",)))
     checks.append(_check_tool("qemu-img", version_args=("--version",)))
     checks.append(_check_tool("tar"))

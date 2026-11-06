@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from simp_vmgen import diagnose as diag
+from simp_vmgen.config import Config
 
 
 def test_check_tool_found(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,6 +63,16 @@ def test_cache_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert cache.status == "ok"
     assert (tmp_path / "cache").is_dir()
     assert disk.status in ("ok", "warn")
+
+
+def test_build_report_flags_unknown_distro(tmp_path: Path) -> None:
+    root = tmp_path / "lab"
+    config = Config.default("lab")
+    config.distro.name = "debian"
+    config.save(root / "vmgen.toml")
+    report = diag.build_report(directory=str(root))
+    assert not report.ok
+    assert any(check.name == "distro" and check.status == "missing" for check in report.checks)
 
 
 def test_render_text_and_json_report() -> None:

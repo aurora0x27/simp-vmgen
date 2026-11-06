@@ -347,6 +347,13 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                     metavar="DIR",
                     help="run the guest command in this directory",
                 )
+                p.add_argument(
+                    "--timeout",
+                    type=float,
+                    default=None,
+                    metavar="SECONDS",
+                    help="fail if the guest command takes longer than this",
+                )
             if name in ("ssh", "guest"):
                 p.add_argument(
                     "guest_command",

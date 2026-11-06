@@ -89,7 +89,8 @@ These attach to a terminal and block: `make tty`, `make ssh`, `make serial`,
 
 Use `simp-vmgen guest -- 'command'` for one shell string, or
 `simp-vmgen guest -- word ...` for argv. `simp-vmgen guest --workdir DIR -- ...`
-runs the command in a guest directory.
+runs the command in a guest directory; add `--timeout SECONDS` for commands
+that may hang.
 
 Kernel projects also provide `make kernel-fetch`, `make kernel-config`,
 `make kernel-build`, `make kernel-initramfs` and `simp-vmgen kernel status`.

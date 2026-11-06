@@ -148,3 +148,33 @@ def test_run_ssh_requires_running_vm(tmp_path: Path) -> None:
     assert main(["new", str(root)]) == 0
     with pytest.raises(ProjectError, match="not running"):
         runtime.guest(SimpleNamespace(directory=str(root), guest_command=["true"]))
+
+
+def test_guest_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "lab"
+    assert main(["new", str(root)]) == 0
+    layout = ProjectLayout(root, Config.load(root / "vmgen.toml"))
+    layout.ensure()
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        RunState(ssh_port=2222, gdb_port=None, pid=process.pid, started_at="now").save(
+            layout.state_file
+        )
+
+        def fake_run(*args: object, **kwargs: object) -> None:
+            raise subprocess.TimeoutExpired("ssh", 1)
+
+        monkeypatch.setattr(runtime.subprocess, "run", fake_run)
+        with pytest.raises(ProjectError, match="timed out"):
+            runtime.guest(
+                SimpleNamespace(
+                    directory=str(root),
+                    guest_command=["true"],
+                    timeout=1,
+                )
+            )
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()

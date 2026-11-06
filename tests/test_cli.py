@@ -61,6 +61,7 @@ def test_ssh_user_option() -> None:
     assert parser.parse_args(["tty", "-u", "alice"]).user == "alice"
     assert parser.parse_args(["guest", "--user", "alice", "--", "true"]).user == "alice"
     assert parser.parse_args(["guest", "--workdir", "/work", "--", "true"]).workdir == "/work"
+    assert parser.parse_args(["guest", "--timeout", "5", "--", "true"]).timeout == 5.0
 
 
 @pytest.mark.parametrize(

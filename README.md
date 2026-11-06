@@ -188,6 +188,18 @@ simp-vmgen -C lab status --check   # exit 3 when stopped
 `--show-secrets` to include them. `status --json` reports the VM state,
 resolved SSH/GDB ports and readiness.
 
+## Running guest commands
+
+```sh
+simp-vmgen -C lab guest -- 'uname -a'
+simp-vmgen -C lab guest --workdir /work -- 'make test'
+simp-vmgen -C lab guest --timeout 300 -- './long-test'
+```
+
+A single argument is passed as one shell command; multiple arguments are
+treated as argv and quoted for the remote shell. Use `--timeout` for commands
+that may hang.
+
 ## Kernel experiments
 
 Two simple modes are supported:

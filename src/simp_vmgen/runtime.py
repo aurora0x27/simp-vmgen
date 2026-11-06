@@ -576,7 +576,15 @@ def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
         argv = _with_setsid(argv)
 
     try:
-        result = subprocess.run(argv, env=env, check=False)
+        result = subprocess.run(
+            argv,
+            env=env,
+            check=False,
+            timeout=getattr(args, "timeout", None),
+        )
+    except subprocess.TimeoutExpired as exc:
+        timeout = getattr(args, "timeout", None)
+        raise ProjectError(f"guest command timed out after {timeout:g}s") from exc
     except OSError as exc:
         raise ProjectError(f"cannot run ssh: {exc}") from exc
     return result.returncode

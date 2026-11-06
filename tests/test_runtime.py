@@ -16,6 +16,11 @@ from simp_vmgen.net import resolve_port
 from simp_vmgen.state import RunState
 
 
+@pytest.fixture(autouse=True)
+def _treat_test_process_as_qemu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runtime, "_pid_matches_qemu", lambda pid: True)
+
+
 def test_port_allocation() -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))

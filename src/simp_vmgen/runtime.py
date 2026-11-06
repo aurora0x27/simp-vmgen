@@ -185,9 +185,21 @@ def _pid_alive(pid: int) -> bool:
     return len(fields) < 3 or fields[2] != "Z"
 
 
+def _pid_matches_qemu(pid: int) -> bool:
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return True
+    parts = raw.split(b"\0")
+    if not parts or not parts[0]:
+        return False
+    program = parts[0].decode("utf-8", errors="replace")
+    return Path(program).name.startswith("qemu-system")
+
+
 def running_pid(layout: ProjectLayout) -> int | None:
     pid = _read_pid(layout.pid_file)
-    if pid is None or not _pid_alive(pid):
+    if pid is None or not _pid_alive(pid) or not _pid_matches_qemu(pid):
         return None
     return pid
 
@@ -209,7 +221,7 @@ def _wait_for_pid(layout: ProjectLayout, timeout: float = 5.0) -> int | None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         pid = _read_pid(layout.pid_file)
-        if pid is not None and _pid_alive(pid):
+        if pid is not None and _pid_alive(pid) and _pid_matches_qemu(pid):
             return pid
         time.sleep(0.1)
     return None

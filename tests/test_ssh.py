@@ -16,6 +16,11 @@ from simp_vmgen.sshkeys import askpass_script, ensure_ssh_key
 from simp_vmgen.state import RunState
 
 
+@pytest.fixture(autouse=True)
+def _treat_test_process_as_qemu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runtime, "_pid_matches_qemu", lambda pid: True)
+
+
 def _layout(tmp_path: Path) -> ProjectLayout:
     config = Config.default("lab")
     return ProjectLayout(tmp_path, config)

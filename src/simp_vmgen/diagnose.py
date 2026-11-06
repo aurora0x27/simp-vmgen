@@ -119,6 +119,40 @@ def _install_hint(tool: str) -> str:
     return f"install {package}"
 
 
+def _kernel_header_hint() -> str:
+    os_id = _os_id()
+    if os_id in ("arch", "manjaro"):
+        return "sudo pacman -S libelf openssl"
+    if os_id in ("debian", "ubuntu"):
+        return "sudo apt install libelf-dev libssl-dev"
+    if os_id in ("fedora", "rhel", "centos"):
+        return "sudo dnf install elfutils-libelf-devel openssl-devel"
+    if os_id == "alpine":
+        return "sudo apk add elfutils-dev openssl-dev"
+    return "install libelf and OpenSSL development headers"
+
+
+def _check_kernel_headers() -> list[CheckResult]:
+    results: list[CheckResult] = []
+    for name, path in (
+        ("libelf headers", Path("/usr/include/libelf.h")),
+        ("openssl headers", Path("/usr/include/openssl/ssl.h")),
+    ):
+        if path.is_file():
+            results.append(CheckResult(name, "ok", detail=str(path)))
+        else:
+            results.append(
+                CheckResult(
+                    name,
+                    "warn",
+                    detail=f"{path} not found",
+                    hint=_kernel_header_hint(),
+                    required=False,
+                )
+            )
+    return results
+
+
 def _check_tool(
     name: str,
     *,
@@ -348,6 +382,7 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
                 if rootfs_spec is not None and rootfs_spec.name == "alpine":
                     checks.append(_check_tool("openssl"))
         else:
+            checks.extend(_check_kernel_headers())
             for tool in (
                 "make",
                 "gcc",

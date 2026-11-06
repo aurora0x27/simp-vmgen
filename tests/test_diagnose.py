@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from simp_vmgen import diagnose as diag
-from simp_vmgen.config import Config
+from simp_vmgen.config import Config, KernelConfig
 
 
 def test_check_tool_found(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,6 +83,18 @@ def test_build_report_flags_missing_mount_source(tmp_path: Path) -> None:
     assert any(
         check.name == "mount sources" and check.status == "missing" for check in report.checks
     )
+
+
+def test_kernel_report_checks_development_headers(tmp_path: Path) -> None:
+    root = tmp_path / "lab"
+    (root / "work").mkdir(parents=True)
+    config = Config.default("lab")
+    config.kernel = KernelConfig(enabled=True, version="6.1.0")
+    config.save(root / "vmgen.toml")
+    report = diag.build_report(directory=str(root))
+    names = {check.name for check in report.checks}
+    assert "libelf headers" in names
+    assert "openssl headers" in names
 
 
 def test_render_text_and_json_report() -> None:

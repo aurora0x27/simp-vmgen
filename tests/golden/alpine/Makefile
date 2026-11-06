@@ -5,10 +5,13 @@ SIMP_VMGEN ?= simp-vmgen
 
 .PHONY: help build regen regen-check show diagnose up restart run run-fg snapshot stop status wait log \
         log-follow tty ssh serial console guest lab kernel-fetch kernel-config \
-        kernel-build kernel-initramfs kernel-status clean distclean
+        kernel-build kernel-rootfs kernel-initramfs kernel-status kernel-clean clean distclean
 
 help:
-	@$(SIMP_VMGEN) --help
+	@echo "golden-alpine targets:"
+	@echo "  build/up/restart/run/wait/status/log/stop/clean"
+	@echo "  guest CMD='...' / lab CMD='...'"
+	@echo "  regen/regen-check/show/diagnose"
 
 build:
 	@$(SIMP_VMGEN) build
@@ -86,8 +89,14 @@ kernel-build:
 kernel-initramfs:
 	@$(SIMP_VMGEN) kernel initramfs
 
+kernel-rootfs:
+	@$(SIMP_VMGEN) kernel rootfs
+
 kernel-status:
 	@$(SIMP_VMGEN) kernel status
+
+kernel-clean:
+	@$(SIMP_VMGEN) kernel clean
 
 clean:
 	@$(SIMP_VMGEN) clean

@@ -104,3 +104,56 @@ def test_make_log_targets(tmp_path: Path, target: str, expected: list[str]) -> N
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert args_file.read_text(encoding="utf-8").splitlines() == expected
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make missing")
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        ("kernel-rootfs", ["kernel", "rootfs"]),
+        ("kernel-clean", ["kernel", "clean"]),
+    ],
+)
+def test_make_kernel_targets(tmp_path: Path, target: str, expected: list[str]) -> None:
+    root, script, args_file = _project(tmp_path)
+    result = subprocess.run(
+        ["make", "-C", str(root), target, f"SIMP_VMGEN={script}"],
+        env={"ARGS_FILE": str(args_file), "PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert args_file.read_text(encoding="utf-8").splitlines() == expected
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make missing")
+def test_make_help_is_project_specific(tmp_path: Path) -> None:
+    root, _script, _args_file = _project(tmp_path)
+    result = subprocess.run(
+        ["make", "-C", str(root), "help"],
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "lab targets:" in result.stdout
+    assert "build/up/restart" in result.stdout
+    assert "kernel-fetch" not in result.stdout
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make missing")
+def test_make_help_lists_kernel_targets(tmp_path: Path) -> None:
+    root = tmp_path / "kernel-lab"
+    assert main(["new", str(root), "--kernel-version", "6.12.5"]) == 0
+    result = subprocess.run(
+        ["make", "-C", str(root), "help"],
+        env={"PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "kernel-fetch" in result.stdout
+    assert "kernel-clean" in result.stdout

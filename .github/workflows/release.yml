@@ -24,6 +24,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --all-groups
 
+      - name: Verify tag matches package version
+        run: |
+          version="$(uv run python -c 'import simp_vmgen; print(simp_vmgen.__version__)')"
+          test "v$version" = "$GITHUB_REF_NAME"
+
+      - name: Run tests
+        run: uv run pytest
+
       - name: Build distributions
         run: uv build
 

@@ -1,17 +1,36 @@
 [project]
 name = "simp-vmgen"
-version = "0.1.0"
+version = "0.2.0"
 description = "Generate reproducible QEMU lab environments"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "aurora0x27", email = "qingfengzl0831@gmail.com" }
 ]
 requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Emulators",
+]
 dependencies = [
     "jinja2>=3.1",
     "shtab>=1.13.0",
     "tomli-w>=1.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/aurora0x27/simp-vmgen"
+Repository = "https://github.com/aurora0x27/simp-vmgen"
+Issues = "https://github.com/aurora0x27/simp-vmgen/issues"
 
 [project.scripts]
 simp-vmgen = "simp_vmgen.cli:main"

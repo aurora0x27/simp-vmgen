@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,12 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
         main(["--version"])
     assert exc.value.code == 0
     assert __version__ in capsys.readouterr().out
+
+
+def test_version_matches_pyproject() -> None:
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    assert data["project"]["version"] == __version__
 
 
 def test_no_command_prints_help(capsys: pytest.CaptureFixture[str]) -> None:

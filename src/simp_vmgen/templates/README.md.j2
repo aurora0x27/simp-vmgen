@@ -112,10 +112,10 @@ Artifact-mode projects skip the source build and boot the configured
 
 ## Requirements
 
-Install `simp-vmgen` on the host from its source repository:
+Install `simp-vmgen` {{ tool_version }} on the host:
 
 ```sh
-uv tool install --editable /path/to/simp-vmgen
+uv tool install "git+https://github.com/aurora0x27/simp-vmgen@v{{ tool_version }}"
 ```
 
 Then run `simp-vmgen diagnose` from this directory to check host dependencies.

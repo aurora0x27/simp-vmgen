@@ -21,16 +21,27 @@ replacement for tools such as `virtme-ng`.
 
 Usable for cloud-image labs, Alpine/Ubuntu experiments, custom kernel builds
 and existing kernel artifacts. See [AGENTS.md](AGENTS.md) for architecture and
-development guidance, and [docs/configuration.md](docs/configuration.md) for
-the full config reference.
+development guidance, [docs/configuration.md](docs/configuration.md) for the
+full config reference, and [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Install
 
+Install the latest release from GitHub:
+
 ```sh
-uv tool install --editable .
-# or, for local development:
-uv run simp-vmgen --help
+uv tool install "git+https://github.com/aurora0x27/simp-vmgen@v0.2.0"
 ```
+
+Alternatively, download the wheel or source archive from the
+[releases page](https://github.com/aurora0x27/simp-vmgen/releases) and install
+it directly:
+
+```sh
+uv tool install ./simp_vmgen-0.2.0-py3-none-any.whl
+```
+
+For local development, use `uv run simp-vmgen --help` from a checkout (see
+[Development](#development)).
 
 ## CLI overview
 
@@ -63,7 +74,7 @@ static busybox initramfs by default.
 | `serial` / `console` | Attach to serial or QEMU monitor (interactive) |
 | `log` | Show or follow the serial log (`-f`, `--lines`, `--no-color`) |
 | `status` / `stop` / `clean` | Inspect, stop or remove runtime state; `status --json`, `--check` |
-| `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow; `status --json` |
+| `kernel fetch/config/build/rootfs/initramfs/status/clean` | Kernel workflow; `status --json` |
 | `gdb` | Connect to the QEMU gdb stub |
 | `completion bash\|zsh\|fish` | Print a shell completion script |
 

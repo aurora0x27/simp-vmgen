@@ -247,9 +247,13 @@ def new_project(args: argparse.Namespace) -> int:
     print("next steps:")
     print(f"  cd {target}")
     print("  make diagnose")
-    print("  make build")
-    print("  make run")
-    print("  make tty")
+    if config.kernel.enabled:
+        print("  make build   # kernel builds can take a long time")
+    else:
+        print("  make build")
+    print("  make up")
+    if config.ssh.enabled:
+        print("  make guest CMD='uname -a'")
     return 0
 
 

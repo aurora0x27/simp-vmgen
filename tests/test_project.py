@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from simp_vmgen.cli import EXIT_ERROR, EXIT_OK, main
 from simp_vmgen.config import Config
 
@@ -25,6 +27,28 @@ def test_new_ubuntu_project(tmp_path: Path) -> None:
     assert "make build" in (target / "README.md").read_text()
     assert ".simp-vmgen/" in (target / ".gitignore").read_text()
     assert (target / ".simp-vmgen" / "generated.json").is_file()
+
+
+def test_new_next_steps_are_non_interactive(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "lab"
+    assert main(["new", str(target)]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "make up" in out
+    assert "make guest" in out
+    assert "make tty" not in out
+
+
+def test_new_kernel_next_steps_are_mode_aware(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "lab-kernel"
+    assert main(["new", str(target), "--kernel-version", "6.12.5"]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "kernel builds can take a long time" in out
+    readme = (target / "README.md").read_text()
+    assert "fetch/configure/build the kernel and initramfs" in readme
 
 
 def test_new_alpine_uses_distro_defaults(tmp_path: Path) -> None:

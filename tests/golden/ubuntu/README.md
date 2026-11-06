@@ -25,7 +25,7 @@ you pass `--force`.
 - Login user: **alice**
 - Resources: 4G RAM, 4 vCPU, 30G disk
 - Accelerator: `auto`
-- SSH: `127.0.0.1:<auto>` (port allocated at build time)
+- SSH: `127.0.0.1:<auto>` (port allocated at run time)
 
 ## Users
 
@@ -66,7 +66,8 @@ make clean
 `simp-vmgen show --json` and `simp-vmgen status --json` are available for
 scripts. `status --check` exits 3 when the VM is stopped.
 
-Build, download and provisioning output is appended to `.simp-vmgen/logs/`.
+Build, download and provisioning output is streamed and appended to
+`.simp-vmgen/logs/`. Kernel builds can take a long time.
 
 ## Non-interactive / agent usage
 
@@ -90,10 +91,10 @@ Artifact-mode projects skip the source build and boot the configured
 
 ## Requirements
 
-Install `simp-vmgen` on the host:
+Install `simp-vmgen` on the host from its source repository:
 
 ```sh
-uv tool install .
+uv tool install --editable /path/to/simp-vmgen
 ```
 
 Then run `simp-vmgen diagnose` from this directory to check host dependencies.

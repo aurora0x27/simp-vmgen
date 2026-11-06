@@ -25,7 +25,7 @@ you pass `--force`.
 - Login user: **{{ config.ssh.user }}**
 - Resources: {{ config.vm.mem }} RAM, {{ config.vm.cpus }} vCPU, {{ config.vm.disk }} disk
 - Accelerator: `{{ config.vm.accel }}`
-- SSH: `{{ config.ssh.host }}:{{ config.ssh.port if config.ssh.port != "auto" else "<auto>" }}`{% if config.ssh.port == "auto" %} (port allocated at build time){% endif %}
+- SSH: `{{ config.ssh.host }}:{{ config.ssh.port if config.ssh.port != "auto" else "<auto>" }}`{% if config.ssh.port == "auto" %} (port allocated at run time){% endif %}
 
 {% if config.kernel.enabled %}
 - Kernel: `{{ config.kernel.mode }}` mode, `{{ config.kernel.version or config.kernel.commit or config.kernel.artifact }}`
@@ -55,7 +55,13 @@ No host directories are shared.
 ## Commands
 
 ```sh
+{% if config.kernel.enabled and config.kernel.mode == "artifact" %}
+make build       # prepare the initramfs for the configured kernel artifact
+{% elif config.kernel.enabled %}
+make build       # fetch/configure/build the kernel and initramfs
+{% else %}
 make build       # download/cache the image, create overlay and seed
+{% endif %}
 make up          # build if needed, start and wait for readiness
 make restart     # stop, start and wait for readiness
 make run         # start the VM in the background
@@ -77,7 +83,8 @@ make clean
 `simp-vmgen show --json` and `simp-vmgen status --json` are available for
 scripts. `status --check` exits 3 when the VM is stopped.
 
-Build, download and provisioning output is appended to `.simp-vmgen/logs/`.
+Build, download and provisioning output is streamed and appended to
+`.simp-vmgen/logs/`. Kernel builds can take a long time.
 
 ## Non-interactive / agent usage
 
@@ -101,10 +108,10 @@ Artifact-mode projects skip the source build and boot the configured
 
 ## Requirements
 
-Install `simp-vmgen` on the host:
+Install `simp-vmgen` on the host from its source repository:
 
 ```sh
-uv tool install .
+uv tool install --editable /path/to/simp-vmgen
 ```
 
 Then run `simp-vmgen diagnose` from this directory to check host dependencies.

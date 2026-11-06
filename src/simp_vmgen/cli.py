@@ -258,12 +258,24 @@ def _add_local_dry_run(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_common_directory(parser: argparse.ArgumentParser) -> None:
+    """Allow -C/--directory after the subcommand as well as before it."""
+    parser.add_argument(
+        "-C",
+        "--directory",
+        metavar="DIR",
+        default=argparse.SUPPRESS,
+        help=argparse.SUPPRESS,
+    )
+
+
 def _add_regen(subparsers: argparse._SubParsersAction) -> None:
     p = subparsers.add_parser(
         "regen",
         help="re-render generated project files",
         description="Re-render generated files from vmgen.toml.",
     )
+    _add_common_directory(p)
     p.add_argument("--check", action="store_true", help="fail if files would change")
     p.add_argument("--force", action="store_true", help="overwrite modified files")
 
@@ -274,6 +286,7 @@ def _add_diagnose(subparsers: argparse._SubParsersAction) -> None:
         help="check host dependencies",
         description="Check the host tools needed by the configured profile.",
     )
+    _add_common_directory(p)
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument(
         "--profile",
@@ -289,6 +302,7 @@ def _add_show(subparsers: argparse._SubParsersAction) -> None:
         help="show the resolved project configuration",
         description="Show the resolved configuration and project paths.",
     )
+    _add_common_directory(p)
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument(
         "--show-secrets",
@@ -315,6 +329,7 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
         ("clean", "stop the VM and remove runtime artifacts"),
     ):
         p = subparsers.add_parser(name, help=help_text)
+        _add_common_directory(p)
 
         if name == "build":
             p.add_argument("--force", action="store_true", help="rebuild artifacts")
@@ -397,6 +412,7 @@ def _add_kernel(subparsers: argparse._SubParsersAction) -> None:
         help="manage the custom kernel build",
         description="Fetch, configure and build a custom Linux kernel.",
     )
+    _add_common_directory(p)
     kernel_sub = p.add_subparsers(dest="kernel_command", metavar="COMMAND")
     for name, help_text in (
         ("fetch", "download and verify the kernel source"),
@@ -408,6 +424,7 @@ def _add_kernel(subparsers: argparse._SubParsersAction) -> None:
         ("clean", "remove kernel build artifacts"),
     ):
         kernel_parser = kernel_sub.add_parser(name, help=help_text)
+        _add_common_directory(kernel_parser)
         if name == "status":
             kernel_parser.add_argument(
                 "--json", action="store_true", help="machine-readable output"
@@ -426,6 +443,7 @@ def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
         help="connect GDB to the running VM",
         description="Connect GDB to the QEMU gdb stub.",
     )
+    _add_common_directory(p)
     p.add_argument(
         "--connect",
         action="store_true",

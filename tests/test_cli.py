@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -109,3 +110,15 @@ def test_dry_run_supported_build(tmp_path: Path) -> None:
     root = tmp_path / "lab"
     assert main(["new", str(root)]) == 0
     assert main(["-C", str(root), "-n", "build"]) == 0
+
+
+def test_directory_option_after_subcommand(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "lab"
+    assert main(["new", str(root)]) == 0
+    capsys.readouterr()
+    assert main(["show", "-C", str(root), "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["root"] == str(root)
+    assert main(["kernel", "status", "-C", str(root)]) == 0

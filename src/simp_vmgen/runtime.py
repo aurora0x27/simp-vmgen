@@ -758,7 +758,12 @@ def console(args: Any) -> int:
 def log(args: Any) -> int:
     _root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(_root, config)
-    return show_log(layout.serial_log, follow=getattr(args, "follow", False))
+    return show_log(
+        layout.serial_log,
+        follow=getattr(args, "follow", False),
+        lines=getattr(args, "lines", 80),
+        no_color=getattr(args, "no_color", False),
+    )
 
 
 def clean(args: Any) -> int:

@@ -402,6 +402,12 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                 action="store_true",
                 help="follow the log (blocks until interrupted)",
             )
+            p.add_argument("--lines", type=int, default=80, metavar="N")
+            p.add_argument(
+                "--no-color",
+                action="store_true",
+                help="strip ANSI escape sequences",
+            )
         elif name == "clean":
             p.add_argument("--all", action="store_true", help="remove .simp-vmgen too")
 

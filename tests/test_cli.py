@@ -122,3 +122,10 @@ def test_directory_option_after_subcommand(
     data = json.loads(capsys.readouterr().out)
     assert data["root"] == str(root)
     assert main(["kernel", "status", "-C", str(root)]) == 0
+
+
+def test_log_options() -> None:
+    args = build_parser().parse_args(["log", "-f", "--lines", "10", "--no-color"])
+    assert args.follow is True
+    assert args.lines == 10
+    assert args.no_color is True

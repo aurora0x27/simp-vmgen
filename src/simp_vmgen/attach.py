@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import select
 import socket
 import sys
@@ -15,6 +16,8 @@ from pathlib import Path
 from .errors import ProjectError
 
 DETACH_BYTE = 0x1D  # Ctrl-]
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
 def attach_socket(path: Path, *, detach_byte: int = DETACH_BYTE) -> int:
@@ -61,22 +64,24 @@ def attach_socket(path: Path, *, detach_byte: int = DETACH_BYTE) -> int:
     return 0
 
 
-def show_log(path: Path, *, follow: bool, lines: int = 80) -> int:
+def show_log(path: Path, *, follow: bool, lines: int = 80, no_color: bool = False) -> int:
     if not path.is_file():
         raise ProjectError(f"log not found: {path} (run the VM first)")
+    strip = no_color or not sys.stdout.isatty()
     try:
         with path.open("r", encoding="utf-8", errors="replace") as handle:
             content = handle.read()
             recent = content.splitlines()[-lines:]
             if recent:
-                print("\n".join(recent))
+                text = "\n".join(recent)
+                print(_ANSI_RE.sub("", text) if strip else text)
             if not follow:
                 return 0
             handle.seek(0, os.SEEK_END)
             while True:
-                chunk = handle.read()
-                if chunk:
-                    sys.stdout.write(chunk)
+                line = handle.readline()
+                if line:
+                    sys.stdout.write(_ANSI_RE.sub("", line) if strip else line)
                     sys.stdout.flush()
                 else:
                     time.sleep(0.3)

@@ -26,6 +26,15 @@ def test_show_log_missing(tmp_path: Path) -> None:
         show_log(tmp_path / "missing.log", follow=False)
 
 
+def test_show_log_strips_ansi_outside_a_terminal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "serial.log"
+    path.write_text("\x1b[32mOK\x1b[0m done\n", encoding="utf-8")
+    assert show_log(path, follow=False) == 0
+    assert capsys.readouterr().out == "OK done\n"
+
+
 def test_attach_missing_socket(tmp_path: Path) -> None:
     with pytest.raises(ProjectError, match="socket not found"):
         attach_socket(tmp_path / "missing.sock")

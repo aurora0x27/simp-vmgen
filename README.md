@@ -61,7 +61,7 @@ static busybox initramfs by default.
 | `wait` | Wait for the readiness marker (`--json`) |
 | `tty` / `ssh` / `guest` | SSH login or run a guest command |
 | `serial` / `console` | Attach to serial or QEMU monitor (interactive) |
-| `log` | Show or follow the serial log (`-f` blocks) |
+| `log` | Show or follow the serial log (`-f`, `--lines`, `--no-color`) |
 | `status` / `stop` / `clean` | Inspect, stop or remove runtime state; `status --json`, `--check` |
 | `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow; `status --json` |
 | `gdb` | Connect to the QEMU gdb stub |

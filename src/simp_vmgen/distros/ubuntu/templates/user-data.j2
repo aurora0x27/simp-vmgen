@@ -87,6 +87,7 @@ bootcmd:
   - [ sh, -c, "sed -i -E 's/^Components:.*/Components: main restricted universe multiverse/' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true" ]
 
 runcmd:
+  - systemctl daemon-reload
   - bash -c 'id ubuntu >/dev/null 2>&1 && userdel -r ubuntu || true'
   - systemctl enable --now ssh || true
   - systemctl restart ssh || true

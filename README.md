@@ -210,6 +210,9 @@ simp-vmgen -C lab restart             # stop, start, wait
 simp-vmgen -C lab run --wait --json   # start and emit one JSON object
 ```
 
+`wait` reports periodic progress, exits early if QEMU disappears, and includes
+the last serial lines when it times out.
+
 ## Kernel experiments
 
 Two simple modes are supported:

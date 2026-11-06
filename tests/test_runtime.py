@@ -218,6 +218,34 @@ def test_wait_detects_qemu_exit(tmp_path: Path) -> None:
             process.wait()
 
 
+def test_wait_reports_progress_and_serial_tail(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _project(tmp_path)
+    capsys.readouterr()
+    layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
+    layout.ensure()
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        layout.serial_log.write_text("kernel panic\n", encoding="utf-8")
+        config = runtime.load_project(str(root))[1]
+        with pytest.raises(ProjectError, match="timed out") as exc:
+            runtime._wait_for_ready(
+                layout,
+                config,
+                timeout=0.7,
+                progress=True,
+                report_interval=0.01,
+            )
+        assert "still waiting" in capsys.readouterr().err
+        assert "kernel panic" in str(exc.value)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
 def test_up_builds_and_runs_with_wait(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _project(tmp_path)
     calls: list[object] = []

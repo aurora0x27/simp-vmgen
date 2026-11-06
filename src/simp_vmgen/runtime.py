@@ -666,6 +666,7 @@ def _wait_for_ready(
     *,
     timeout: int,
     progress: bool,
+    report_interval: float = 5.0,
 ) -> dict[str, Any]:
     start = time.monotonic()
     deadline = start + timeout
@@ -688,7 +689,7 @@ def _wait_for_ready(
                 f"see `simp-vmgen log` ({layout.serial_log}){detail}"
             )
         now = time.monotonic()
-        if progress and now - last_report >= 5:
+        if progress and now - last_report >= report_interval:
             print(f"  still waiting... {int(now - start)}s", file=sys.stderr)
             last_report = now
         time.sleep(0.5)

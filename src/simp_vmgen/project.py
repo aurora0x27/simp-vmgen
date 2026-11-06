@@ -206,6 +206,13 @@ def new_project(args: argparse.Namespace) -> int:
         raise ProjectError(f"target exists and is not a directory: {target}")
     if target.exists() and any(target.iterdir()) and not args.force:
         raise ProjectError(f"target directory is not empty: {target} (use --force to overwrite)")
+    if target.exists() and any(target.iterdir()) and args.force:
+        action = "would overwrite" if args.dry_run else "overwriting"
+        print(
+            f"warning: {action} existing files in {target} "
+            "(including vmgen.toml, Makefile, README.md and .gitignore)",
+            file=sys.stderr,
+        )
 
     if args.interactive:
         if not sys.stdin.isatty():

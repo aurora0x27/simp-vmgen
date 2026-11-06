@@ -786,6 +786,10 @@ def clean(args: Any) -> int:
     stop(args)
     _cleanup_socket_dir(layout)
     if getattr(args, "all", False):
+        print(
+            "warning: removing .simp-vmgen (SSH keys, logs, kernel build and guest state)",
+            file=sys.stderr,
+        )
         shutil.rmtree(layout.runtime_dir, ignore_errors=True)
         print(f"removed {layout.runtime_dir}")
     else:

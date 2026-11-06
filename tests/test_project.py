@@ -231,6 +231,17 @@ def test_new_refuses_non_empty_directory(tmp_path: Path) -> None:
     assert not (target / "vmgen.toml").exists()
 
 
+def test_new_force_warns_when_overwriting(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    target = tmp_path / "busy"
+    target.mkdir()
+    (target / "keep.txt").write_text("keep", encoding="utf-8")
+    assert main(["new", str(target), "--force"]) == EXIT_OK
+    assert "overwriting existing files" in capsys.readouterr().err
+    assert (target / "keep.txt").is_file()
+
+
 def test_new_dry_run(tmp_path: Path) -> None:
     target = tmp_path / "dry"
     assert main(["-n", "new", str(target)]) == EXIT_OK

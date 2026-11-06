@@ -244,7 +244,11 @@ def _add_new(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument("--kernel-initrd", metavar="PATH")
     p.add_argument("--kernel-append", metavar="ARGS")
     p.add_argument("--rootfs", default="busybox", metavar="NAME")
-    p.add_argument("--force", action="store_true", help="overwrite a non-empty directory")
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite generated files in a non-empty directory (can replace vmgen.toml)",
+    )
     _add_local_dry_run(p)
 
 
@@ -409,7 +413,11 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                 help="strip ANSI escape sequences",
             )
         elif name == "clean":
-            p.add_argument("--all", action="store_true", help="remove .simp-vmgen too")
+            p.add_argument(
+                "--all",
+                action="store_true",
+                help="remove .simp-vmgen too (SSH keys, logs, kernel build and guest state)",
+            )
 
 
 def _add_kernel(subparsers: argparse._SubParsersAction) -> None:

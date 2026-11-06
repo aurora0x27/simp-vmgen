@@ -73,3 +73,13 @@ def test_clean_removes_run_and_all(tmp_path: Path) -> None:
     (layout.run_dir / "cloud-init").mkdir(parents=True)
     assert runtime.clean(SimpleNamespace(directory=str(root), all=True)) == 0
     assert not layout.runtime_dir.exists()
+
+
+def test_clean_all_warns_about_destructive_removal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "lab"
+    assert main(["new", str(root)]) == 0
+    capsys.readouterr()
+    assert runtime.clean(SimpleNamespace(directory=str(root), all=True)) == 0
+    assert "SSH keys" in capsys.readouterr().err

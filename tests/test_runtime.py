@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import socket
 import subprocess
@@ -126,6 +127,91 @@ def test_status_and_stop(tmp_path: Path) -> None:
         process.wait(timeout=5)
         assert process.poll() is not None
         assert not layout.pid_file.exists()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def test_status_json_and_check(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _project(tmp_path)
+    capsys.readouterr()
+    assert (
+        runtime.status(SimpleNamespace(directory=str(root), json=True, check=True))
+        == runtime.EXIT_NOT_RUNNING
+    )
+    data = json.loads(capsys.readouterr().out)
+    assert data["state"] == "stopped"
+    assert data["pid"] is None
+    assert data["ready"] is False
+    assert data["ssh"] is None
+
+    layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
+    layout.ensure()
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        RunState(
+            ssh_port=2222,
+            gdb_port=1234,
+            pid=process.pid,
+            started_at="now",
+        ).save(layout.state_file)
+        layout.serial_log.write_text("SIMP_VMGEN_READY name=lab\n", encoding="utf-8")
+
+        assert runtime.status(SimpleNamespace(directory=str(root), json=True, check=True)) == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["state"] == "running"
+        assert data["pid"] == process.pid
+        assert data["ssh"] == {"user": "root", "host": "127.0.0.1", "port": 2222}
+        assert data["gdb"] == {"host": "127.0.0.1", "port": 1234}
+        assert data["ready"] is True
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def test_wait_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _project(tmp_path)
+    capsys.readouterr()
+    layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
+    layout.ensure()
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        RunState(
+            ssh_port=2222,
+            gdb_port=None,
+            pid=process.pid,
+            started_at="now",
+        ).save(layout.state_file)
+        layout.serial_log.write_text("booting\nSIMP_VMGEN_READY name=lab\n")
+        assert runtime.wait(SimpleNamespace(directory=str(root), timeout=5, json=True)) == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["ready"] is True
+        assert data["timeout"] == 5
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def test_wait_detects_qemu_exit(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
+    layout.ensure()
+    process = subprocess.Popen(["sh", "-c", "sleep 0.2"])
+    try:
+        layout.pid_file.write_text(str(process.pid), encoding="utf-8")
+        RunState(
+            ssh_port=2222,
+            gdb_port=None,
+            pid=process.pid,
+            started_at="now",
+        ).save(layout.state_file)
+        with pytest.raises(ProjectError, match="exited before"):
+            runtime.wait(SimpleNamespace(directory=str(root), timeout=5, json=True))
     finally:
         if process.poll() is None:
             process.kill()

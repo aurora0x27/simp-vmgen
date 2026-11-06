@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -92,6 +93,20 @@ def test_kernel_status(tmp_path: Path, capsys) -> None:
     assert "source  : tarball 6.1.0" in out
     assert "image   :" in out
     assert "initrd  :" in out
+
+
+def test_kernel_status_json(tmp_path: Path, capsys) -> None:
+    _config(tmp_path, ["bzImage"])
+    assert kernel.kernel_status(SimpleNamespace(directory=str(tmp_path), json=True)) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["enabled"] is True
+    assert data["mode"] == "build"
+    assert data["source"]["kind"] == "tarball"
+    assert data["source"]["version"] == "6.1.0"
+    assert data["rootfs"]["name"] == "busybox"
+    assert data["image"]["path"].endswith("arch/x86/boot/bzImage")
+    assert data["initrd"]["path"].endswith("initramfs.cpio.gz")
+    assert data["lock"] is None
 
 
 def test_kernel_clean(tmp_path: Path) -> None:

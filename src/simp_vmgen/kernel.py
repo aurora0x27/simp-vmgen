@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -402,41 +403,98 @@ def kernel_rootfs(args: Any) -> int:
 
 def kernel_status(args: Any) -> int:
     root, config, layout = _project(args)
+    json_output = getattr(args, "json", False)
     if not config.kernel.enabled:
-        print("kernel: disabled")
+        if json_output:
+            print(json.dumps({"enabled": False}, indent=2))
+        else:
+            print("kernel: disabled")
         return 0
-    print(f"mode    : {config.kernel.mode}")
+
+    source: dict[str, Any]
     if config.kernel.mode == "artifact":
-        print(f"artifact: {config.kernel.artifact} ({config.kernel.artifact_type})")
+        source = {
+            "kind": "artifact",
+            "artifact": config.kernel.artifact,
+            "artifact_type": config.kernel.artifact_type,
+        }
     elif config.kernel.commit:
-        print(f"source  : git {config.kernel.repo} @ {config.kernel.commit}")
-        print(f"tree    : {layout.kernel_dir / 'src' / 'linux-git'}")
+        source = {
+            "kind": "git",
+            "repo": config.kernel.repo,
+            "commit": config.kernel.commit,
+            "tree": str(layout.kernel_dir / "src" / "linux-git"),
+        }
     else:
-        print(f"source  : tarball {config.kernel.version}")
-        print(f"tree    : {layout.kernel_dir / 'src' / f'linux-{config.kernel.version}'}")
-    print(f"build   : {kernel_build_dir(layout)}")
+        source = {
+            "kind": "tarball",
+            "version": config.kernel.version,
+            "tree": str(layout.kernel_dir / "src" / f"linux-{config.kernel.version}"),
+        }
+
+    rootfs: dict[str, Any] | None = None
     if config.kernel.rootfs != "none":
         spec = load_rootfs(config.kernel.rootfs)
         rootfs_path = layout.kernel_dir / "rootfs" / spec.name
-        print(f"rootfs  : {spec.name} {spec.release} ({spec.kind})")
-        print(f"          {rootfs_path} ({'present' if rootfs_path.is_dir() else 'missing'})")
+        rootfs = {
+            "name": spec.name,
+            "release": spec.release,
+            "kind": spec.kind,
+            "path": str(rootfs_path),
+            "present": rootfs_path.is_dir(),
+        }
+
     image: Path | None
     if config.kernel.mode == "artifact":
         image = Path(config.kernel.artifact).expanduser()
     else:
         image = built_image_path(config, layout)
-    if image is not None:
-        print(f"image   : {image} ({'present' if image.is_file() else 'missing'})")
     initrd = (
         Path(config.kernel.initrd)
         if config.kernel.initrd
         else layout.kernel_dir / "initramfs.cpio.gz"
     )
-    print(f"initrd  : {initrd} ({'present' if initrd.is_file() else 'missing'})")
     lock_path = root / LOCK_FILENAME
-    if lock_path.is_file():
-        lock = Lock.load(lock_path)
-        print(f"lock    : {lock.kernel.source or '(empty)'}")
+    lock_data = asdict(Lock.load(lock_path).kernel) if lock_path.is_file() else None
+
+    data: dict[str, Any] = {
+        "enabled": True,
+        "mode": config.kernel.mode,
+        "source": source,
+        "build": str(kernel_build_dir(layout)),
+        "rootfs": rootfs,
+        "image": ({"path": str(image), "present": image.is_file()} if image is not None else None),
+        "initrd": {"path": str(initrd), "present": initrd.is_file()},
+        "lock": lock_data,
+    }
+    if json_output:
+        print(json.dumps(data, indent=2))
+        return 0
+
+    print(f"mode    : {config.kernel.mode}")
+    if source["kind"] == "artifact":
+        print(f"artifact: {source['artifact']} ({source['artifact_type']})")
+    elif source["kind"] == "git":
+        print(f"source  : git {source['repo']} @ {source['commit']}")
+        print(f"tree    : {source['tree']}")
+    else:
+        print(f"source  : tarball {source['version']}")
+        print(f"tree    : {source['tree']}")
+    print(f"build   : {data['build']}")
+    if rootfs is not None:
+        print(f"rootfs  : {rootfs['name']} {rootfs['release']} ({rootfs['kind']})")
+        print(f"          {rootfs['path']} ({'present' if rootfs['present'] else 'missing'})")
+    if data["image"] is not None:
+        print(
+            f"image   : {data['image']['path']} "
+            f"({'present' if data['image']['present'] else 'missing'})"
+        )
+    print(
+        f"initrd  : {data['initrd']['path']} "
+        f"({'present' if data['initrd']['present'] else 'missing'})"
+    )
+    if lock_data is not None:
+        print(f"lock    : {lock_data.get('source') or '(empty)'}")
     return 0
 
 

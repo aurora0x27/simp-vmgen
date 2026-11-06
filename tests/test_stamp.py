@@ -142,3 +142,32 @@ def test_kernel_artifact_run_rejects_config_changes(
 
     assert runtime.build(_args(root, dry_run=False, force=False)) == 0
     assert runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False)) == 0
+
+
+@pytest.mark.skipif(
+    shutil.which("qemu-system-x86_64") is None
+    or not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")),
+    reason="qemu or seed tool missing",
+)
+def test_run_json_dry_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _base = _cloud_project(tmp_path, monkeypatch)
+    capsys.readouterr()
+    assert (
+        runtime.run(
+            _args(
+                root,
+                dry_run=True,
+                foreground=False,
+                snapshot=False,
+                json=True,
+            )
+        )
+        == 0
+    )
+    data = json.loads(capsys.readouterr().out)
+    assert data["state"] == "dry-run"
+    assert data["qemu_argv"][0] == "qemu-system-x86_64"
+    assert data["foreground"] is False
+    assert data["snapshot"] is False

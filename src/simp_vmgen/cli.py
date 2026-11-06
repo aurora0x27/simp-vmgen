@@ -288,6 +288,11 @@ def _add_show(subparsers: argparse._SubParsersAction) -> None:
         description="Show the resolved configuration and project paths.",
     )
     p.add_argument("--json", action="store_true", help="machine-readable output")
+    p.add_argument(
+        "--show-secrets",
+        action="store_true",
+        help="include user passwords in JSON output",
+    )
 
 
 def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
@@ -317,9 +322,18 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                 help="run in the foreground (blocks until QEMU exits)",
             )
             p.add_argument("--snapshot", action="store_true", help="discard writes on exit")
+            p.add_argument("--json", action="store_true", help="machine-readable output")
             _add_local_dry_run(p)
+        elif name == "status":
+            p.add_argument("--json", action="store_true", help="machine-readable output")
+            p.add_argument(
+                "--check",
+                action="store_true",
+                help="exit 3 when the VM is stopped",
+            )
         elif name == "wait":
             p.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
+            p.add_argument("--json", action="store_true", help="machine-readable output")
         elif name in ("ssh", "tty", "guest"):
             p.add_argument(
                 "-u",
@@ -368,6 +382,10 @@ def _add_kernel(subparsers: argparse._SubParsersAction) -> None:
         ("clean", "remove kernel build artifacts"),
     ):
         kernel_parser = kernel_sub.add_parser(name, help=help_text)
+        if name == "status":
+            kernel_parser.add_argument(
+                "--json", action="store_true", help="machine-readable output"
+            )
         if name in ("fetch", "config", "build", "rootfs", "initramfs"):
             _add_local_dry_run(kernel_parser)
         if name in ("rootfs", "initramfs"):

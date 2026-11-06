@@ -53,16 +53,16 @@ static busybox initramfs by default.
 |---|---|
 | `new` | Create a project, optionally with `-i` |
 | `regen` | Re-render thin project files; `--check`, `--force` |
-| `show` | Show resolved config; `--json` |
+| `show` | Show resolved config; `--json`, `--show-secrets` |
 | `diagnose` | Check host dependencies |
 | `build` | Prepare image/seed or kernel/initramfs |
-| `run` | Start QEMU (`--foreground`, `--snapshot`) |
-| `wait` | Wait for the readiness marker |
+| `run` | Start QEMU (`--foreground`, `--snapshot`, `--json`) |
+| `wait` | Wait for the readiness marker (`--json`) |
 | `tty` / `ssh` / `guest` | SSH login or run a guest command |
-| `serial` / `console` | Attach to serial or QEMU monitor |
-| `log` | Show or follow the serial log |
-| `status` / `stop` / `clean` | Inspect, stop or remove runtime state |
-| `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow |
+| `serial` / `console` | Attach to serial or QEMU monitor (interactive) |
+| `log` | Show or follow the serial log (`-f` blocks) |
+| `status` / `stop` / `clean` | Inspect, stop or remove runtime state; `status --json`, `--check` |
+| `kernel fetch/config/build/initramfs/status/clean` | Kernel workflow; `status --json` |
 | `gdb` | Connect to the QEMU gdb stub |
 | `completion bash\|zsh\|fish` | Print a shell completion script |
 
@@ -179,10 +179,14 @@ share (`host0`, `host1`, ...) and is mounted in the guest by cloud-init.
 ```sh
 simp-vmgen -C lab show
 simp-vmgen -C lab show --json
+simp-vmgen -C lab status --json
+simp-vmgen -C lab status --check   # exit 3 when stopped
 ```
 
 `show` prints the resolved configuration, lock information and runtime paths.
-`--json` is intended for scripts.
+`--json` is intended for scripts and redacts user passwords by default; pass
+`--show-secrets` to include them. `status --json` reports the VM state,
+resolved SSH/GDB ports and readiness.
 
 ## Kernel experiments
 

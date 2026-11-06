@@ -61,7 +61,8 @@ make stop
 make clean
 ```
 
-`simp-vmgen show --json` is available for scripts.
+`simp-vmgen show --json` and `simp-vmgen status --json` are available for
+scripts. `status --check` exits 3 when the VM is stopped.
 
 Build, download and provisioning output is appended to `.simp-vmgen/logs/`.
 

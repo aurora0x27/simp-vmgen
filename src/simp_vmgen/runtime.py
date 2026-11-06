@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shlex
 import shutil
@@ -28,6 +29,8 @@ from .qemu import build_argv
 from .seed import READY_MARKER, render_cloud_init
 from .sshkeys import askpass_script, ensure_ssh_key
 from .state import RunState, utc_now
+
+EXIT_NOT_RUNNING = 3
 
 
 def _run_command(argv: list[str], what: str, *, timeout: int | None = None) -> None:
@@ -223,9 +226,48 @@ def _save_run_state(
     ).save(layout.state_file)
 
 
+def _run_summary_data(
+    config: Config,
+    layout: ProjectLayout,
+    *,
+    ssh_port: int,
+    gdb_port: int | None,
+    pid: int,
+) -> dict[str, Any]:
+    return {
+        "state": "running",
+        "pid": pid,
+        "ssh": (
+            {
+                "user": config.ssh.user,
+                "host": config.ssh.host,
+                "port": ssh_port,
+            }
+            if config.ssh.enabled
+            else None
+        ),
+        "gdb": ({"host": "127.0.0.1", "port": gdb_port} if gdb_port is not None else None),
+        "serial_log": str(layout.serial_log),
+    }
+
+
 def _print_run_summary(
-    config: Config, layout: ProjectLayout, *, ssh_port: int, gdb_port: int | None, pid: int
+    config: Config,
+    layout: ProjectLayout,
+    *,
+    ssh_port: int,
+    gdb_port: int | None,
+    pid: int,
+    json_output: bool = False,
 ) -> None:
+    if json_output:
+        print(
+            json.dumps(
+                _run_summary_data(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid),
+                indent=2,
+            )
+        )
+        return
     print(f"VM started: pid={pid}")
     if config.ssh.enabled:
         print(f"ssh       : {config.ssh.user}@{config.ssh.host}:{ssh_port}")
@@ -266,7 +308,20 @@ def run(args: Any) -> int:
         snapshot=getattr(args, "snapshot", False),
     )
     if getattr(args, "dry_run", False):
-        print(shlex.join(argv))
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "state": "dry-run",
+                        "qemu_argv": argv,
+                        "foreground": foreground,
+                        "snapshot": getattr(args, "snapshot", False),
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(shlex.join(argv))
         return 0
 
     if shutil.which(argv[0]) is None:
@@ -283,7 +338,14 @@ def run(args: Any) -> int:
         pid = _wait_for_pid(layout)
         if pid is not None:
             _save_run_state(layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
-            _print_run_summary(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
+            _print_run_summary(
+                config,
+                layout,
+                ssh_port=ssh_port,
+                gdb_port=gdb_port,
+                pid=pid,
+                json_output=getattr(args, "json", False),
+            )
         return process.wait()
 
     try:
@@ -299,7 +361,14 @@ def run(args: Any) -> int:
         raise ProjectError("QEMU did not create a pid file; check qemu.log")
 
     _save_run_state(layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
-    _print_run_summary(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
+    _print_run_summary(
+        config,
+        layout,
+        ssh_port=ssh_port,
+        gdb_port=gdb_port,
+        pid=pid,
+        json_output=getattr(args, "json", False),
+    )
     return 0
 
 
@@ -332,18 +401,49 @@ def status(args: Any) -> int:
     root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(root, config)
     pid = running_pid(layout)
-    if pid is None:
-        print("stopped")
-        return 0
+    state = RunState.load(layout.state_file) if pid is not None else None
+    ready = _ready_marker_seen(layout) if pid is not None else False
+    ssh_data: dict[str, Any] | None = (
+        {
+            "user": config.ssh.user,
+            "host": config.ssh.host,
+            "port": state.ssh_port,
+        }
+        if state is not None and config.ssh.enabled
+        else None
+    )
+    gdb_data: dict[str, Any] | None = (
+        {"host": "127.0.0.1", "port": state.gdb_port}
+        if state is not None and state.gdb_port is not None
+        else None
+    )
+    data: dict[str, Any] = {
+        "state": "running" if pid is not None else "stopped",
+        "pid": pid,
+        "ssh": ssh_data,
+        "gdb": gdb_data,
+        "started_at": state.started_at if state is not None else None,
+        "serial_log": str(layout.serial_log),
+        "ready": ready,
+    }
 
-    state = RunState.load(layout.state_file)
-    print(f"running   pid={pid}")
-    if state is not None:
-        print(f"ssh       {config.ssh.user}@{config.ssh.host}:{state.ssh_port}")
-        if state.gdb_port is not None:
-            print(f"gdb       127.0.0.1:{state.gdb_port}")
-        print(f"started   {state.started_at}")
-    print(f"serial    {layout.serial_log}")
+    if getattr(args, "json", False):
+        print(json.dumps(data, indent=2))
+    elif pid is None:
+        print("stopped")
+    else:
+        print(f"running   pid={pid}")
+        if ssh_data is not None:
+            print(f"ssh       {ssh_data['user']}@{ssh_data['host']}:{ssh_data['port']}")
+        if gdb_data is not None:
+            print(f"gdb       127.0.0.1:{gdb_data['port']}")
+        if state is not None:
+            print(f"started   {state.started_at}")
+        print(f"ready     {'yes' if ready else 'no'}")
+        print(f"serial    {layout.serial_log}")
+
+    if pid is None and getattr(args, "check", False):
+        return EXIT_NOT_RUNNING
     return 0
 
 
@@ -502,22 +602,62 @@ def _ready_marker_seen(layout: ProjectLayout) -> bool:
         return False
 
 
+def _serial_tail(layout: ProjectLayout, lines: int = 20) -> str:
+    try:
+        content = layout.serial_log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return "\n".join(content.splitlines()[-lines:])
+
+
 def wait(args: Any) -> int:
     _root, config = load_project(getattr(args, "directory", None))
     layout = ProjectLayout(_root, config)
     _require_state(layout)
     timeout = getattr(args, "timeout", None) or config.ssh.wait_timeout
-    deadline = time.monotonic() + timeout
+    json_output = getattr(args, "json", False)
+    start = time.monotonic()
+    deadline = start + timeout
+    last_report = start
 
-    print(f"waiting for the guest (timeout {timeout}s) ...")
+    if not json_output:
+        print(f"waiting for the guest (timeout {timeout}s) ...")
     while time.monotonic() < deadline:
         if _ready_marker_seen(layout):
-            print("guest is ready")
+            elapsed = time.monotonic() - start
+            if json_output:
+                print(
+                    json.dumps(
+                        {
+                            "ready": True,
+                            "elapsed_seconds": round(elapsed, 3),
+                            "timeout": timeout,
+                            "serial_log": str(layout.serial_log),
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print("guest is ready")
             return 0
-        time.sleep(1)
+        if running_pid(layout) is None:
+            tail = _serial_tail(layout)
+            detail = f"\n{tail}" if tail else ""
+            raise ProjectError(
+                "the VM exited before the guest became ready; "
+                f"see `simp-vmgen log` ({layout.serial_log}){detail}"
+            )
+        now = time.monotonic()
+        if not json_output and now - last_report >= 5:
+            print(f"  still waiting... {int(now - start)}s", file=sys.stderr)
+            last_report = now
+        time.sleep(0.5)
+
+    tail = _serial_tail(layout)
+    detail = f"\n{tail}" if tail else ""
     raise ProjectError(
         f"timed out after {timeout}s waiting for the guest; "
-        f"see `simp-vmgen log` ({layout.serial_log})"
+        f"see `simp-vmgen log` ({layout.serial_log}){detail}"
     )
 
 

@@ -316,12 +316,17 @@ def show_project(args: argparse.Namespace) -> int:
     lock = Lock.load(lock_path) if lock_path.is_file() else None
 
     if getattr(args, "json", False):
+        config_data = asdict(config)
+        if not getattr(args, "show_secrets", False):
+            for user in config_data.get("users", []):
+                if isinstance(user, dict) and user.get("password"):
+                    user["password"] = "***"
         data = {
             "root": str(root),
             "config_path": str(root / CONFIG_FILENAME),
             "lock_path": str(lock_path),
             "runtime_dir": str(layout.runtime_dir),
-            "config": asdict(config),
+            "config": config_data,
             "lock": asdict(lock) if lock is not None else None,
         }
         print(json.dumps(data, indent=2))

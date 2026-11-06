@@ -33,6 +33,18 @@ def test_show_json(tmp_path: Path, capsys) -> None:
     assert data["lock"]["image_filename"].endswith(".img")
 
 
+def test_show_json_redacts_passwords(tmp_path: Path, capsys) -> None:
+    root = _project(tmp_path)
+    capsys.readouterr()
+    assert main(["-C", str(root), "show", "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["config"]["users"][0]["password"] == "***"
+
+    assert main(["-C", str(root), "show", "--json", "--show-secrets"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["config"]["users"][0]["password"] == "114514"
+
+
 def test_generated_readme_and_gitignore(tmp_path: Path) -> None:
     root = _project(tmp_path)
     readme = (root / "README.md").read_text()

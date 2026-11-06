@@ -169,6 +169,7 @@ def test_status_json_and_check(tmp_path: Path, capsys: pytest.CaptureFixture[str
     assert data["pid"] is None
     assert data["ready"] is False
     assert data["ssh"] is None
+    assert data["qemu_log"].endswith("qemu.log")
 
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()

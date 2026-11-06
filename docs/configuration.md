@@ -33,6 +33,9 @@ name = "root"
 password = "114514"
 ```
 
+The generated defaults use a `root` account with password `114514`, timezone
+`Asia/Shanghai`, and SSH bound to `127.0.0.1`. Change these for shared hosts.
+
 ## Project and distro
 
 | Key | Meaning |
@@ -113,6 +116,10 @@ readonly = false
 | `provision.extra_packages` | Additional guest packages |
 | `provision.extra_user_data` | Extra raw cloud-init user-data appended to the seed |
 
+`provision.package_sets = []` explicitly disables the distro default package
+set. Removing the key restores the default `["base"]`; an empty array is not the
+same as omitting it.
+
 ## Kernel: build mode
 
 ```toml
@@ -181,7 +188,8 @@ Rootfs plugin metadata supports:
 
 `vmgen.lock` records the pinned distro image and kernel source/artifact. It is
 created by `new` and updated by `build`, `kernel fetch` and kernel preparation.
-Commit it to preserve reproducibility.
+Commit it to preserve reproducibility. `build` and kernel preparation can
+rewrite it, so review the diff after those commands.
 
 ## Runtime layout
 
@@ -189,7 +197,7 @@ Commit it to preserve reproducibility.
 .simp-vmgen/
 ├── generated.json          # generated-file hashes for regen
 ├── build.json              # config hash and artifact metadata
-├── run/                    # pid, sockets, logs, overlay, seed
+├── run/                    # pid, sockets, serial.log, qemu.log, overlay, seed
 ├── ssh/                    # generated SSH key
 ├── logs/                   # build, download and provisioning logs
 └── kernel/

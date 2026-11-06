@@ -75,6 +75,16 @@ def test_build_report_flags_unknown_distro(tmp_path: Path) -> None:
     assert any(check.name == "distro" and check.status == "missing" for check in report.checks)
 
 
+def test_build_report_flags_missing_mount_source(tmp_path: Path) -> None:
+    root = tmp_path / "lab"
+    Config.default("lab").save(root / "vmgen.toml")
+    report = diag.build_report(directory=str(root))
+    assert not report.ok
+    assert any(
+        check.name == "mount sources" and check.status == "missing" for check in report.checks
+    )
+
+
 def test_render_text_and_json_report() -> None:
     report = diag.DiagnosticReport(
         platform="linux x86_64",

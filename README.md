@@ -277,8 +277,8 @@ simp-vmgen diagnose --json
 ```
 
 `diagnose` checks QEMU, image tooling, SSH, cloud-init seed tools, kernel build
-dependencies, `/dev/kvm`, cache permissions, disk space and configured ports.
-It exits non-zero when a required tool is missing.
+dependencies, `/dev/kvm`, cache permissions, disk space, configured ports and
+mount sources. It exits non-zero when a required tool is missing.
 
 ## Shell completion
 

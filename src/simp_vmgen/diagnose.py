@@ -17,6 +17,7 @@ from .cache import cache_dir
 from .config import Config
 from .distros import load_distro
 from .errors import ProjectError, SimpVmgenError
+from .mounts import resolve_mounts
 from .paths import load_project
 from .rootfs import load_rootfs
 
@@ -289,6 +290,19 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
                     "distro",
                     "ok",
                     detail=f"{distro.name} {release.version}",
+                )
+            )
+        root = _root or Path.cwd()
+        try:
+            mounts = resolve_mounts(config, root)
+        except SimpVmgenError as exc:
+            checks.append(CheckResult("mount sources", "missing", detail=str(exc)))
+        else:
+            checks.append(
+                CheckResult(
+                    "mount sources",
+                    "ok",
+                    detail=f"{len(mounts)} configured",
                 )
             )
     checks.append(_check_tool(f"qemu-system-{arch}", version_args=("--version",)))

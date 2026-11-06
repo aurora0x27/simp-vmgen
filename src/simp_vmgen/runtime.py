@@ -480,6 +480,7 @@ def status(args: Any) -> int:
         "gdb": gdb_data,
         "started_at": state.started_at if state is not None else None,
         "serial_log": str(layout.serial_log),
+        "qemu_log": str(layout.qemu_log),
         "ready": ready,
     }
 
@@ -497,6 +498,7 @@ def status(args: Any) -> int:
             print(f"started   {state.started_at}")
         print(f"ready     {'yes' if ready else 'no'}")
         print(f"serial    {layout.serial_log}")
+        print(f"qemu log  {layout.qemu_log}")
 
     if pid is None and getattr(args, "check", False):
         return EXIT_NOT_RUNNING

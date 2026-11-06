@@ -494,7 +494,24 @@ def kernel_status(args: Any) -> int:
         f"({'present' if data['initrd']['present'] else 'missing'})"
     )
     if lock_data is not None:
-        print(f"lock    : {lock_data.get('source') or '(empty)'}")
+        source_kind = lock_data.get("source")
+        if source_kind == "tarball":
+            detail = " ".join(
+                item
+                for item in (
+                    "tarball",
+                    str(lock_data.get("version") or ""),
+                    str(lock_data.get("checksum") or ""),
+                )
+                if item
+            )
+        elif source_kind == "git":
+            detail = f"git {lock_data.get('repo') or ''} @ {lock_data.get('commit') or ''}"
+        elif source_kind == "artifact":
+            detail = f"artifact {lock_data.get('artifact') or ''}"
+        else:
+            detail = str(source_kind or "(empty)")
+        print(f"lock    : {detail}")
     return 0
 
 

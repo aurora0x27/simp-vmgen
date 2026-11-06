@@ -31,6 +31,8 @@ def test_show_json(tmp_path: Path, capsys) -> None:
     assert data["root"] == str(root)
     assert data["config"]["project"]["name"] == "lab"
     assert data["config"]["ssh"]["user"] == "root"
+    assert data["mounts"][0]["source"] == "work"
+    assert data["mounts"][0]["tag"] == "host0"
     assert data["lock"]["image_filename"].endswith(".img")
 
 

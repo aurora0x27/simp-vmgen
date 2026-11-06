@@ -340,6 +340,15 @@ def show_project(args: argparse.Namespace) -> int:
             "lock_path": str(lock_path),
             "runtime_dir": str(layout.runtime_dir),
             "config": config_data,
+            "mounts": [
+                {
+                    "source": mount.source,
+                    "target": mount.target,
+                    "readonly": mount.readonly,
+                    "tag": tag,
+                }
+                for mount, tag in zip(config.mounts, config.mount_tags(), strict=True)
+            ],
             "lock": asdict(lock) if lock is not None else None,
         }
         print(json.dumps(data, indent=2))

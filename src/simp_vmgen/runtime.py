@@ -295,14 +295,15 @@ def run(args: Any) -> int:
     layout = ProjectLayout(root, config)
     layout.ensure()
 
-    if running_pid(layout) is not None:
+    if running_pid(layout) is not None and not getattr(args, "dry_run", False):
         raise ProjectError("the VM is already running; run `simp-vmgen stop` first")
-    if config.kernel.enabled:
-        image = kernel_image_path(config, layout)
-        initrd = kernel_initrd_path(config, layout)
-        stamp.require_kernel_artifacts(config, layout, image, initrd)
-    else:
-        stamp.require_cloud_artifacts(config, layout)
+    if not getattr(args, "dry_run", False):
+        if config.kernel.enabled:
+            image = kernel_image_path(config, layout)
+            initrd = kernel_initrd_path(config, layout)
+            stamp.require_kernel_artifacts(config, layout, image, initrd)
+        else:
+            stamp.require_cloud_artifacts(config, layout)
 
     ssh_port = resolve_port(config.ssh.host, config.ssh.port, start=2222)
     gdb_port = None
@@ -322,6 +323,7 @@ def run(args: Any) -> int:
         gdb_port=gdb_port,
         foreground=foreground,
         snapshot=getattr(args, "snapshot", False),
+        dry_run=getattr(args, "dry_run", False),
     )
     if getattr(args, "dry_run", False):
         if getattr(args, "json", False):

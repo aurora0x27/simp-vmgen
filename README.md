@@ -57,7 +57,7 @@ static busybox initramfs by default.
 | `diagnose` | Check host dependencies |
 | `build` | Prepare image/seed or kernel/initramfs |
 | `up` / `restart` | Build if needed + start + wait, or stop + start + wait |
-| `run` | Start QEMU (`--foreground`, `--snapshot`, `--wait`, `--json`) |
+| `run` | Start QEMU (`--foreground`, `--snapshot`, `--wait`, `--json`); `--dry-run` previews without artifacts |
 | `wait` | Wait for the readiness marker (`--json`) |
 | `tty` / `ssh` / `guest` | SSH login or run a guest command |
 | `serial` / `console` | Attach to serial or QEMU monitor (interactive) |

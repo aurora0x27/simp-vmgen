@@ -89,6 +89,25 @@ def test_build_and_run_dry_run(
     assert "-drive" in out
 
 
+def test_run_dry_run_before_build(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = _project(tmp_path)
+    capsys.readouterr()
+    assert (
+        runtime.run(
+            SimpleNamespace(
+                directory=str(root),
+                dry_run=True,
+                foreground=False,
+                snapshot=False,
+            )
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "qemu-system-x86_64" in out
+    assert "-drive" in out
+
+
 def test_gdb_reports_connection(tmp_path: Path, capsys) -> None:
     root = tmp_path / "gdb"
     assert main(["new", str(root), "--gdb"]) == 0

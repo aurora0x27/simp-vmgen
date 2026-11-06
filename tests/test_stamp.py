@@ -65,10 +65,12 @@ def test_run_rejects_config_changes_since_build(
     config.users[0].password = "changed"
     config.save(root / "vmgen.toml")
 
+    layout = runtime.ProjectLayout(root, config)
     with pytest.raises(ProjectError, match="configuration changed"):
-        runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False))
+        stamp.require_cloud_artifacts(config, layout)
 
     assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+    stamp.require_cloud_artifacts(config, layout)
     assert runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False)) == 0
 
 
@@ -104,11 +106,14 @@ def test_build_recovers_when_stamp_is_missing(
 ) -> None:
     root, _base = _cloud_project(tmp_path, monkeypatch)
     (root / ".simp-vmgen" / stamp.STAMP_FILENAME).unlink()
+    config = Config.load(root / "vmgen.toml")
+    layout = runtime.ProjectLayout(root, config)
 
     with pytest.raises(ProjectError, match="no build stamp"):
-        runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False))
+        stamp.require_cloud_artifacts(config, layout)
 
     assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+    stamp.require_cloud_artifacts(config, layout)
     assert runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False)) == 0
 
 
@@ -137,10 +142,12 @@ def test_kernel_artifact_run_rejects_config_changes(
 
     config.users[0].password = "changed"
     config.save(root / "vmgen.toml")
+    layout = runtime.ProjectLayout(root, config)
     with pytest.raises(ProjectError, match="stale"):
-        runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False))
+        stamp.require_kernel_artifacts(config, layout, artifact, initrd)
 
     assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+    stamp.require_kernel_artifacts(config, layout, artifact, initrd)
     assert runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False)) == 0
 
 

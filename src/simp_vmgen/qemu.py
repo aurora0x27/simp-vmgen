@@ -39,6 +39,7 @@ def build_argv(
     gdb_port: int | None,
     foreground: bool = False,
     snapshot: bool = False,
+    dry_run: bool = False,
 ) -> list[str]:
     accel, cpu = resolve_accel(config)
     machine = config.vm.machine or release.machine or "q35"
@@ -61,18 +62,36 @@ def build_argv(
     ]
 
     if config.kernel.enabled:
-        from .kernel import kernel_image_path, kernel_initrd_path
+        from .kernel import built_image_path, kernel_image_path, kernel_initrd_path
 
         append = "console=ttyS0 panic=-1"
         if not config.kernel.initrd:
             append += " rdinit=/init"
         if config.kernel.append:
             append += f" {config.kernel.append}"
+        if dry_run:
+            if config.kernel.mode == "artifact":
+                image = Path(config.kernel.artifact).expanduser()
+                if not image.is_absolute():
+                    image = layout.root / image
+            else:
+                image = built_image_path(config, layout) or (
+                    layout.kernel_dir / "build" / "vmlinux"
+                )
+            if config.kernel.initrd:
+                initrd = Path(config.kernel.initrd).expanduser()
+                if not initrd.is_absolute():
+                    initrd = layout.root / initrd
+            else:
+                initrd = layout.kernel_dir / "initramfs.cpio.gz"
+        else:
+            image = kernel_image_path(config, layout)
+            initrd = kernel_initrd_path(config, layout)
         argv += [
             "-kernel",
-            str(kernel_image_path(config, layout)),
+            str(image),
             "-initrd",
-            str(kernel_initrd_path(config, layout)),
+            str(initrd),
             "-append",
             append,
         ]

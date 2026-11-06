@@ -86,3 +86,21 @@ def test_make_guest_requires_command(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert 'usage: make guest CMD="..."' in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("make") is None, reason="make missing")
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [("log", ["log"]), ("log-follow", ["log", "-f"])],
+)
+def test_make_log_targets(tmp_path: Path, target: str, expected: list[str]) -> None:
+    root, script, args_file = _project(tmp_path)
+    result = subprocess.run(
+        ["make", "-C", str(root), target, f"SIMP_VMGEN={script}"],
+        env={"ARGS_FILE": str(args_file), "PATH": "/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert args_file.read_text(encoding="utf-8").splitlines() == expected

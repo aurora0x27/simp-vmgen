@@ -39,6 +39,8 @@ def test_generated_readme_and_gitignore(tmp_path: Path) -> None:
     assert "make regen-check" in readme
     assert "make show" in readme
     assert "make diagnose" in readme
+    assert "Non-interactive / agent usage" in readme
+    assert "make log-follow" in readme
     assert "`root`" in readme
     assert "`/work`" in readme
     assert "vmgen.lock" in readme

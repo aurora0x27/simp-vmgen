@@ -58,15 +58,16 @@ No host directories are shared.
 make build       # download/cache the image, create overlay and seed
 make run         # start the VM in the background
 make wait        # wait for the guest readiness marker
-make tty         # SSH into the guest
+make tty         # interactive: SSH into the guest
 make guest CMD='...'   # run one command in the guest
 make lab CMD='...'     # run one command in {{ work_target }}
 make show        # show the resolved configuration
 make diagnose    # check host dependencies
-make serial      # attach to the serial console
-make console     # attach to the QEMU monitor
+make serial      # interactive: attach to the serial console
+make console     # interactive: attach to the QEMU monitor
 make status
-make log
+make log         # print recent serial log lines
+make log-follow  # interactive: follow the serial log
 make stop
 make clean
 ```
@@ -74,6 +75,20 @@ make clean
 `simp-vmgen show --json` is available for scripts.
 
 Build, download and provisioning output is appended to `.simp-vmgen/logs/`.
+
+## Non-interactive / agent usage
+
+Safe for scripts and agents: `make diagnose`, `make show`, `make build`,
+`make run`, `make wait`, `make status`, `make guest CMD=...`, `make log`,
+`make stop`, `make clean`.
+
+These attach to a terminal and block: `make tty`, `make ssh`, `make serial`,
+`make console`, `make log-follow`, `make run-fg`, and
+`simp-vmgen gdb --connect`.
+
+Use `simp-vmgen guest -- 'command'` for one shell string, or
+`simp-vmgen guest -- word ...` for argv. `simp-vmgen guest --workdir DIR -- ...`
+runs the command in a guest directory.
 
 Kernel projects also provide `make kernel-fetch`, `make kernel-config`,
 `make kernel-build`, `make kernel-initramfs` and `simp-vmgen kernel status`.

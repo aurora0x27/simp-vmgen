@@ -293,15 +293,15 @@ def _add_show(subparsers: argparse._SubParsersAction) -> None:
 def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
     for name, help_text in (
         ("build", "prepare images, seed and other build artifacts"),
-        ("run", "start the VM"),
+        ("run", "start the VM (interactive with --foreground)"),
         ("stop", "stop the VM"),
         ("status", "show VM status"),
         ("wait", "wait until the guest is ready"),
-        ("ssh", "open an SSH session in the guest"),
-        ("tty", "open an interactive SSH session in the guest"),
-        ("serial", "attach to the guest serial console"),
-        ("console", "attach to the QEMU monitor"),
-        ("log", "show or follow the serial log"),
+        ("ssh", "open an SSH session or run a command"),
+        ("tty", "open an interactive SSH session (interactive)"),
+        ("serial", "attach to the guest serial console (interactive)"),
+        ("console", "attach to the QEMU monitor (interactive)"),
+        ("log", "show the serial log (--follow is interactive)"),
         ("guest", "run one command in the guest"),
         ("clean", "stop the VM and remove runtime artifacts"),
     ):
@@ -311,7 +311,11 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
             p.add_argument("--force", action="store_true", help="rebuild artifacts")
             _add_local_dry_run(p)
         elif name == "run":
-            p.add_argument("--foreground", action="store_true", help="do not daemonize")
+            p.add_argument(
+                "--foreground",
+                action="store_true",
+                help="run in the foreground (blocks until QEMU exits)",
+            )
             p.add_argument("--snapshot", action="store_true", help="discard writes on exit")
             _add_local_dry_run(p)
         elif name == "wait":
@@ -337,7 +341,12 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
                     help="command to run (use -- before CMD)",
                 )
         elif name == "log":
-            p.add_argument("-f", "--follow", action="store_true", help="follow the log")
+            p.add_argument(
+                "-f",
+                "--follow",
+                action="store_true",
+                help="follow the log (blocks until interrupted)",
+            )
         elif name == "clean":
             p.add_argument("--all", action="store_true", help="remove .simp-vmgen too")
 
@@ -373,7 +382,11 @@ def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
         help="connect GDB to the running VM",
         description="Connect GDB to the QEMU gdb stub.",
     )
-    p.add_argument("--connect", action="store_true", help="start gdb automatically")
+    p.add_argument(
+        "--connect",
+        action="store_true",
+        help="start gdb automatically (interactive)",
+    )
 
 
 def _add_completion(subparsers: argparse._SubParsersAction) -> None:

@@ -82,7 +82,10 @@ def test_kernel_build_dry_run(
     )
     assert kernel.kernel_build(SimpleNamespace(directory=str(tmp_path), dry_run=True)) == 0
     assert not (layout.kernel_dir / "build" / "arch/x86/boot/bzImage").exists()
-    assert "would build kernel" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "would build kernel" in out
+    assert "defconfig" in out
+    assert "olddefconfig" in out
 
 
 def test_kernel_status(tmp_path: Path, capsys) -> None:

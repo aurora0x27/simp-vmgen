@@ -224,8 +224,8 @@ def build_kernel(
     if not dry_run:
         _update_kernel_lock(root, config, info)
     build = kernel_build_dir(layout)
-    if not dry_run and not (build / ".config").is_file():
-        configure_kernel(config, root, info.path, layout)
+    if not (build / ".config").is_file():
+        configure_kernel(config, root, info.path, layout, dry_run=dry_run)
     for target in config.kernel.targets:
         _run_make(
             info.path,

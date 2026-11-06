@@ -45,6 +45,8 @@ non-root account.
 
 ```sh
 make build       # download/cache the image, create overlay and seed
+make up          # build if needed, start and wait for readiness
+make restart     # stop, start and wait for readiness
 make run         # start the VM in the background
 make wait        # wait for the guest readiness marker
 make tty         # interactive: SSH into the guest

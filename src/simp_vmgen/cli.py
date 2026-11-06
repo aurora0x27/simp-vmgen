@@ -20,12 +20,14 @@ from .runtime import console as runtime_console
 from .runtime import gdb as runtime_gdb
 from .runtime import guest as runtime_guest
 from .runtime import log as runtime_log
+from .runtime import restart as runtime_restart
 from .runtime import run as runtime_run
 from .runtime import serial as runtime_serial
 from .runtime import ssh as runtime_ssh
 from .runtime import status as runtime_status
 from .runtime import stop as runtime_stop
 from .runtime import tty as runtime_tty
+from .runtime import up as runtime_up
 from .runtime import wait as runtime_wait
 
 PROG = "simp-vmgen"
@@ -298,6 +300,8 @@ def _add_show(subparsers: argparse._SubParsersAction) -> None:
 def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
     for name, help_text in (
         ("build", "prepare images, seed and other build artifacts"),
+        ("up", "build if needed, start and wait for the VM"),
+        ("restart", "stop, start and wait for the VM"),
         ("run", "start the VM (interactive with --foreground)"),
         ("stop", "stop the VM"),
         ("status", "show VM status"),
@@ -315,6 +319,15 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
         if name == "build":
             p.add_argument("--force", action="store_true", help="rebuild artifacts")
             _add_local_dry_run(p)
+        elif name == "up":
+            p.add_argument(
+                "--no-build",
+                action="store_true",
+                help="start existing artifacts without running build",
+            )
+            p.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
+        elif name == "restart":
+            p.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
         elif name == "run":
             p.add_argument(
                 "--foreground",
@@ -323,6 +336,12 @@ def _add_lifecycle(subparsers: argparse._SubParsersAction) -> None:
             )
             p.add_argument("--snapshot", action="store_true", help="discard writes on exit")
             p.add_argument("--json", action="store_true", help="machine-readable output")
+            p.add_argument(
+                "--wait",
+                action="store_true",
+                help="wait for the guest readiness marker after starting",
+            )
+            p.add_argument("--wait-timeout", type=int, default=None, metavar="SECONDS")
             _add_local_dry_run(p)
         elif name == "status":
             p.add_argument("--json", action="store_true", help="machine-readable output")
@@ -450,6 +469,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "diagnose": diagnose,
         "show": show_project,
         "build": runtime_build,
+        "up": runtime_up,
+        "restart": runtime_restart,
         "run": runtime_run,
         "stop": runtime_stop,
         "status": runtime_status,

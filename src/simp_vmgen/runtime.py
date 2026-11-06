@@ -265,15 +265,16 @@ def _print_run_summary(
             json.dumps(
                 _run_summary_data(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid),
                 indent=2,
-            )
+            ),
+            flush=True,
         )
         return
-    print(f"VM started: pid={pid}")
+    print(f"VM started: pid={pid}", flush=True)
     if config.ssh.enabled:
-        print(f"ssh       : {config.ssh.user}@{config.ssh.host}:{ssh_port}")
+        print(f"ssh       : {config.ssh.user}@{config.ssh.host}:{ssh_port}", flush=True)
     if gdb_port is not None:
-        print(f"gdb       : 127.0.0.1:{gdb_port}")
-    print(f"serial log: {layout.serial_log}")
+        print(f"gdb       : 127.0.0.1:{gdb_port}", flush=True)
+    print(f"serial log: {layout.serial_log}", flush=True)
 
 
 def run(args: Any) -> int:
@@ -297,6 +298,9 @@ def run(args: Any) -> int:
         gdb_port = resolve_port("127.0.0.1", config.gdb.port, start=1234, exclude={ssh_port})
 
     foreground = getattr(args, "foreground", False)
+    wait_after = getattr(args, "wait", False)
+    if foreground and wait_after:
+        raise ProjectError("--foreground cannot be combined with --wait")
     argv = build_argv(
         config,
         distro,
@@ -361,15 +365,53 @@ def run(args: Any) -> int:
         raise ProjectError("QEMU did not create a pid file; check qemu.log")
 
     _save_run_state(layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
-    _print_run_summary(
-        config,
-        layout,
-        ssh_port=ssh_port,
-        gdb_port=gdb_port,
-        pid=pid,
-        json_output=getattr(args, "json", False),
-    )
+    json_output = getattr(args, "json", False)
+    if wait_after:
+        timeout = getattr(args, "wait_timeout", None) or config.ssh.wait_timeout
+        if json_output:
+            wait_data = _wait_for_ready(layout, config, timeout=timeout, progress=False)
+            data = _run_summary_data(config, layout, ssh_port=ssh_port, gdb_port=gdb_port, pid=pid)
+            data.update(wait_data)
+            print(json.dumps(data, indent=2))
+        else:
+            _print_run_summary(
+                config,
+                layout,
+                ssh_port=ssh_port,
+                gdb_port=gdb_port,
+                pid=pid,
+            )
+            _wait_for_ready(layout, config, timeout=timeout, progress=True)
+            print("guest is ready", flush=True)
+    else:
+        _print_run_summary(
+            config,
+            layout,
+            ssh_port=ssh_port,
+            gdb_port=gdb_port,
+            pid=pid,
+            json_output=json_output,
+        )
     return 0
+
+
+def up(args: Any) -> int:
+    root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(root, config)
+    if running_pid(layout) is not None:
+        return wait(args)
+    if not getattr(args, "no_build", False):
+        build(args)
+    args.wait = True
+    args.wait_timeout = getattr(args, "timeout", None)
+    return run(args)
+
+
+def restart(args: Any) -> int:
+    stop(args)
+    args.wait = True
+    args.wait_timeout = getattr(args, "timeout", None)
+    return run(args)
 
 
 def stop(args: Any) -> int:
@@ -618,36 +660,26 @@ def _serial_tail(layout: ProjectLayout, lines: int = 20) -> str:
     return "\n".join(content.splitlines()[-lines:])
 
 
-def wait(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
-    layout = ProjectLayout(_root, config)
-    _require_state(layout)
-    timeout = getattr(args, "timeout", None) or config.ssh.wait_timeout
-    json_output = getattr(args, "json", False)
+def _wait_for_ready(
+    layout: ProjectLayout,
+    config: Config,
+    *,
+    timeout: int,
+    progress: bool,
+) -> dict[str, Any]:
     start = time.monotonic()
     deadline = start + timeout
     last_report = start
-
-    if not json_output:
-        print(f"waiting for the guest (timeout {timeout}s) ...")
+    if progress:
+        print(f"waiting for the guest (timeout {timeout}s) ...", flush=True)
     while time.monotonic() < deadline:
         if _ready_marker_seen(layout):
-            elapsed = time.monotonic() - start
-            if json_output:
-                print(
-                    json.dumps(
-                        {
-                            "ready": True,
-                            "elapsed_seconds": round(elapsed, 3),
-                            "timeout": timeout,
-                            "serial_log": str(layout.serial_log),
-                        },
-                        indent=2,
-                    )
-                )
-            else:
-                print("guest is ready")
-            return 0
+            return {
+                "ready": True,
+                "elapsed_seconds": round(time.monotonic() - start, 3),
+                "timeout": timeout,
+                "serial_log": str(layout.serial_log),
+            }
         if running_pid(layout) is None:
             tail = _serial_tail(layout)
             detail = f"\n{tail}" if tail else ""
@@ -656,7 +688,7 @@ def wait(args: Any) -> int:
                 f"see `simp-vmgen log` ({layout.serial_log}){detail}"
             )
         now = time.monotonic()
-        if not json_output and now - last_report >= 5:
+        if progress and now - last_report >= 5:
             print(f"  still waiting... {int(now - start)}s", file=sys.stderr)
             last_report = now
         time.sleep(0.5)
@@ -667,6 +699,20 @@ def wait(args: Any) -> int:
         f"timed out after {timeout}s waiting for the guest; "
         f"see `simp-vmgen log` ({layout.serial_log}){detail}"
     )
+
+
+def wait(args: Any) -> int:
+    _root, config = load_project(getattr(args, "directory", None))
+    layout = ProjectLayout(_root, config)
+    _require_state(layout)
+    timeout = getattr(args, "timeout", None) or config.ssh.wait_timeout
+    json_output = getattr(args, "json", False)
+    data = _wait_for_ready(layout, config, timeout=timeout, progress=not json_output)
+    if json_output:
+        print(json.dumps(data, indent=2))
+    else:
+        print("guest is ready", flush=True)
+    return 0
 
 
 def gdb(args: Any) -> int:

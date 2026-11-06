@@ -56,7 +56,8 @@ static busybox initramfs by default.
 | `show` | Show resolved config; `--json`, `--show-secrets` |
 | `diagnose` | Check host dependencies |
 | `build` | Prepare image/seed or kernel/initramfs |
-| `run` | Start QEMU (`--foreground`, `--snapshot`, `--json`) |
+| `up` / `restart` | Build if needed + start + wait, or stop + start + wait |
+| `run` | Start QEMU (`--foreground`, `--snapshot`, `--wait`, `--json`) |
 | `wait` | Wait for the readiness marker (`--json`) |
 | `tty` / `ssh` / `guest` | SSH login or run a guest command |
 | `serial` / `console` | Attach to serial or QEMU monitor (interactive) |
@@ -199,6 +200,15 @@ simp-vmgen -C lab guest --timeout 300 -- './long-test'
 A single argument is passed as one shell command; multiple arguments are
 treated as argv and quoted for the remote shell. Use `--timeout` for commands
 that may hang.
+
+## One-shot start
+
+```sh
+simp-vmgen -C lab up                  # build if needed, start, wait
+simp-vmgen -C lab up --no-build       # start existing artifacts, wait
+simp-vmgen -C lab restart             # stop, start, wait
+simp-vmgen -C lab run --wait --json   # start and emit one JSON object
+```
 
 ## Kernel experiments
 

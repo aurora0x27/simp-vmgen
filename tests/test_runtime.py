@@ -216,3 +216,56 @@ def test_wait_detects_qemu_exit(tmp_path: Path) -> None:
         if process.poll() is None:
             process.kill()
             process.wait()
+
+
+def test_up_builds_and_runs_with_wait(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _project(tmp_path)
+    calls: list[object] = []
+    monkeypatch.setattr(
+        runtime,
+        "build",
+        lambda args: calls.append("build") or 0,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "run",
+        lambda args: (
+            calls.append(("run", getattr(args, "wait", False), getattr(args, "wait_timeout", None)))
+            or 0
+        ),
+    )
+
+    args = SimpleNamespace(directory=str(root), no_build=False, timeout=42)
+    assert runtime.up(args) == 0
+    assert calls == ["build", ("run", True, 42)]
+
+
+def test_up_waits_when_already_running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _project(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(runtime, "running_pid", lambda layout: 123)
+    monkeypatch.setattr(runtime, "build", lambda args: calls.append("build") or 0)
+    monkeypatch.setattr(runtime, "run", lambda args: calls.append("run") or 0)
+    monkeypatch.setattr(runtime, "wait", lambda args: calls.append("wait") or 0)
+
+    args = SimpleNamespace(directory=str(root), no_build=False, timeout=42)
+    assert runtime.up(args) == 0
+    assert calls == ["wait"]
+
+
+def test_restart_stops_and_runs_with_wait(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _project(tmp_path)
+    calls: list[object] = []
+    monkeypatch.setattr(runtime, "stop", lambda args: calls.append("stop") or 0)
+    monkeypatch.setattr(
+        runtime,
+        "run",
+        lambda args: (
+            calls.append(("run", getattr(args, "wait", False), getattr(args, "wait_timeout", None)))
+            or 0
+        ),
+    )
+
+    args = SimpleNamespace(directory=str(root), timeout=7)
+    assert runtime.restart(args) == 0
+    assert calls == ["stop", ("run", True, 7)]

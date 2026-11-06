@@ -171,3 +171,58 @@ def test_run_json_dry_run(
     assert data["qemu_argv"][0] == "qemu-system-x86_64"
     assert data["foreground"] is False
     assert data["snapshot"] is False
+
+
+@pytest.mark.skipif(
+    shutil.which("qemu-system-x86_64") is None
+    or not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")),
+    reason="qemu or seed tool missing",
+)
+def test_run_wait_json_combines_summary_and_readiness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _base = _cloud_project(tmp_path, monkeypatch)
+    layout = runtime.ProjectLayout(root, Config.load(root / "vmgen.toml"))
+    process = subprocess.Popen(["sleep", "30"])
+    try:
+        monkeypatch.setattr(runtime, "_wait_for_pid", lambda *args, **kwargs: process.pid)
+        monkeypatch.setattr(
+            runtime,
+            "_wait_for_ready",
+            lambda *args, **kwargs: {
+                "ready": True,
+                "elapsed_seconds": 1.0,
+                "timeout": 5,
+                "serial_log": str(layout.serial_log),
+            },
+        )
+        monkeypatch.setattr(
+            runtime.subprocess,
+            "run",
+            lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+        )
+        capsys.readouterr()
+        assert (
+            runtime.run(
+                _args(
+                    root,
+                    dry_run=False,
+                    foreground=False,
+                    snapshot=False,
+                    json=True,
+                    wait=True,
+                    wait_timeout=5,
+                )
+            )
+            == 0
+        )
+        data = json.loads(capsys.readouterr().out)
+        assert data["state"] == "running"
+        assert data["pid"] == process.pid
+        assert data["ready"] is True
+        assert data["timeout"] == 5
+        assert isinstance(data["ssh"]["port"], int)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()

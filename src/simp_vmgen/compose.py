@@ -8,6 +8,8 @@ import json
 import os
 import re
 import tomllib
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -85,6 +87,7 @@ class ComposeState:
     root: str = ""
     networks: dict[str, str] = field(default_factory=dict)
     services: list[str] = field(default_factory=list)
+    service_roots: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -364,12 +367,18 @@ def load_state(root: Path) -> ComposeState | None:
     services = data.get("services", [])
     if not isinstance(services, list) or not all(isinstance(item, str) for item in services):
         raise ComposeError(f"invalid compose state services in {path}")
+    service_roots = data.get("service_roots", {})
+    if not isinstance(service_roots, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in service_roots.items()
+    ):
+        raise ComposeError(f"invalid compose state service roots in {path}")
     return ComposeState(
         schema=STATE_SCHEMA_VERSION,
         project=str(data.get("project", "")),
         root=str(data.get("root", "")),
         networks=dict(networks),
         services=list(services),
+        service_roots=dict(service_roots),
     )
 
 
@@ -386,6 +395,7 @@ def save_state(root: Path, state: ComposeState) -> None:
                     "root": state.root,
                     "networks": dict(sorted(state.networks.items())),
                     "services": sorted(state.services),
+                    "service_roots": dict(sorted(state.service_roots.items())),
                 },
                 indent=2,
             )
@@ -397,35 +407,64 @@ def save_state(root: Path, state: ComposeState) -> None:
         raise ComposeError(f"cannot write compose state {path}: {exc}") from exc
 
 
+@contextmanager
+def compose_lock(root: Path) -> Iterator[None]:
+    with file_lock(root.resolve() / COMPOSE_DIR / LOCK_FILENAME):
+        yield
+
+
 def ensure_state(compose: ComposeConfig) -> ComposeState:
+    with compose_lock(compose.root):
+        return ensure_state_locked(compose)
+
+
+def ensure_state_locked(compose: ComposeConfig) -> ComposeState:
     root = compose.root.resolve()
-    lock_path = root / COMPOSE_DIR / LOCK_FILENAME
-    with file_lock(lock_path):
-        state = load_state(root) or ComposeState()
-        state.project = compose.project.name
-        state.root = str(root)
-        with file_lock(_registry_lock_path()):
-            registry = _load_registry()
-            _prune_registry(registry)
-            endpoints: dict[str, str] = {}
-            for name, network in compose.networks.items():
-                if network.mcast:
-                    endpoint = network.mcast
-                    _claim(registry, endpoint, root)
-                elif name in state.networks:
-                    endpoint = state.networks[name]
-                    _claim(registry, endpoint, root)
-                else:
-                    endpoint = _allocate(registry, root, name)
-                endpoints[name] = endpoint
-            for endpoint in state.networks.values():
-                if endpoint not in endpoints.values():
-                    _release(registry, root, endpoint)
-            _save_registry(registry)
-        state.networks = endpoints
-        state.services = sorted(compose.services)
-        save_state(root, state)
-        return state
+    state = load_state(root) or ComposeState()
+    state.project = compose.project.name
+    state.root = str(root)
+    with file_lock(_registry_lock_path()):
+        registry = _load_registry()
+        _prune_registry(registry)
+        endpoints: dict[str, str] = {}
+        for name, network in compose.networks.items():
+            if network.mcast:
+                endpoint = network.mcast
+                _claim(registry, endpoint, root)
+            elif name in state.networks:
+                endpoint = state.networks[name]
+                _claim(registry, endpoint, root)
+            else:
+                endpoint = _allocate(registry, root, name)
+            endpoints[name] = endpoint
+        for endpoint in state.networks.values():
+            if endpoint not in endpoints.values():
+                _release(registry, root, endpoint)
+        _save_registry(registry)
+    state.networks = endpoints
+    state.services = sorted(compose.services)
+    state.service_roots = {name: str(service.root) for name, service in compose.services.items()}
+    save_state(root, state)
+    return state
+
+
+def release_state(root: Path) -> None:
+    with compose_lock(root):
+        release_state_locked(root)
+
+
+def release_state_locked(root: Path) -> None:
+    root = root.resolve()
+    state = load_state(root)
+    if state is None:
+        return
+    with file_lock(_registry_lock_path()):
+        registry = _load_registry()
+        _prune_registry(registry)
+        for endpoint in state.networks.values():
+            _release(registry, root, endpoint)
+        _save_registry(registry)
+    state_path(root).unlink(missing_ok=True)
 
 
 def service_status(
@@ -508,15 +547,6 @@ def compose_show(args: Any) -> int:
     state = ensure_state(compose)
     print_show(compose, state, json_output=getattr(args, "json", False))
     return 0
-
-
-def compose_dispatch(args: Any) -> int:
-    command = getattr(args, "compose_command", None)
-    if command == "validate":
-        return compose_validate(args)
-    if command == "show":
-        return compose_show(args)
-    raise ComposeError("compose requires a subcommand (validate, show)")
 
 
 def member_marker(root: Path) -> Path:

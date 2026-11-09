@@ -18,7 +18,7 @@ from . import stamp
 from .attach import attach_socket, show_log
 from .cache import download, images_dir
 from .compose import assert_standalone_allowed
-from .config import LOCK_FILENAME, Config
+from .config import CONFIG_FILENAME, LOCK_FILENAME, Config
 from .distros import Distro, DistroRelease, load_distro
 from .errors import ProjectError
 from .kernel import ensure_kernel_artifacts, kernel_image_path, kernel_initrd_path
@@ -42,6 +42,19 @@ def _run_command(argv: list[str], what: str, *, timeout: int | None = None) -> N
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise ProjectError(f"{what} failed: {detail}")
+
+
+def _load_args(args: Any) -> tuple[Path, Config]:
+    override = getattr(args, "config_override", None)
+    if override is not None:
+        directory = getattr(args, "directory", None)
+        if directory is None:
+            raise ProjectError("compose lifecycle requires a service directory")
+        root = Path(directory).expanduser().resolve()
+        if not (root / CONFIG_FILENAME).is_file():
+            raise ProjectError(f"no {CONFIG_FILENAME} in {root}")
+        return root, override
+    return load_project(getattr(args, "directory", None))
 
 
 def _load_distro(config: Config) -> tuple[Distro, DistroRelease]:
@@ -88,7 +101,7 @@ def _create_overlay(layout: ProjectLayout, base: Path, release: DistroRelease) -
 
 
 def build(args: Any) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+    root, config = _load_args(args)
     distro, release = _load_distro(config)
     layout = ProjectLayout(root, config)
     layout.ensure()
@@ -291,7 +304,7 @@ def _print_run_summary(
 
 
 def run(args: Any) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+    root, config = _load_args(args)
     assert_standalone_allowed(root)
     distro, release = _load_distro(config)
     layout = ProjectLayout(root, config)
@@ -412,7 +425,7 @@ def run(args: Any) -> int:
 
 
 def up(args: Any) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+    root, config = _load_args(args)
     layout = ProjectLayout(root, config)
     if running_pid(layout) is not None:
         return wait(args)
@@ -431,7 +444,7 @@ def restart(args: Any) -> int:
 
 
 def stop(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
+    _root, config = _load_args(args)
     layout = ProjectLayout(_root, config)
     pid = running_pid(layout)
     if pid is None:
@@ -455,8 +468,7 @@ def stop(args: Any) -> int:
     return 0
 
 
-def status(args: Any) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+def status_data(root: Path, config: Config) -> dict[str, Any]:
     layout = ProjectLayout(root, config)
     pid = running_pid(layout)
     state = RunState.load(layout.state_file) if pid is not None else None
@@ -475,7 +487,7 @@ def status(args: Any) -> int:
         if state is not None and state.gdb_port is not None
         else None
     )
-    data: dict[str, Any] = {
+    return {
         "state": "running" if pid is not None else "stopped",
         "pid": pid,
         "ssh": ssh_data,
@@ -485,6 +497,17 @@ def status(args: Any) -> int:
         "qemu_log": str(layout.qemu_log),
         "ready": ready,
     }
+
+
+def status(args: Any) -> int:
+    root, config = _load_args(args)
+    data = status_data(root, config)
+    layout = ProjectLayout(root, config)
+    pid = data["pid"]
+    state = RunState.load(layout.state_file) if pid is not None else None
+    ssh_data = data["ssh"]
+    gdb_data = data["gdb"]
+    ready = data["ready"]
 
     if getattr(args, "json", False):
         print(json.dumps(data, indent=2))
@@ -603,7 +626,7 @@ def _with_setsid(argv: list[str]) -> list[str]:
 
 
 def _run_ssh(args: Any, *, tty: bool, require_command: bool) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+    root, config = _load_args(args)
     layout = ProjectLayout(root, config)
     if not config.ssh.enabled:
         raise ProjectError("SSH is disabled in vmgen.toml")
@@ -720,13 +743,24 @@ def _wait_for_ready(
     )
 
 
-def wait(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
-    layout = ProjectLayout(_root, config)
+def wait_for_ready(
+    root: Path, config: Config, *, timeout: int | None = None, progress: bool = True
+) -> dict[str, Any]:
+    layout = ProjectLayout(root, config)
     _require_state(layout)
-    timeout = getattr(args, "timeout", None) or config.ssh.wait_timeout
+    return _wait_for_ready(
+        layout,
+        config,
+        timeout=timeout or config.ssh.wait_timeout,
+        progress=progress,
+    )
+
+
+def wait(args: Any) -> int:
+    _root, config = _load_args(args)
+    timeout = getattr(args, "timeout", None)
     json_output = getattr(args, "json", False)
-    data = _wait_for_ready(layout, config, timeout=timeout, progress=not json_output)
+    data = wait_for_ready(_root, config, timeout=timeout, progress=not json_output)
     if json_output:
         print(json.dumps(data, indent=2))
     else:
@@ -735,7 +769,7 @@ def wait(args: Any) -> int:
 
 
 def gdb(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
+    _root, config = _load_args(args)
     layout = ProjectLayout(_root, config)
     state = _require_state(layout)
     if not config.gdb.enabled or state.gdb_port is None:
@@ -752,7 +786,7 @@ def gdb(args: Any) -> int:
 
 
 def serial(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
+    _root, config = _load_args(args)
     layout = ProjectLayout(_root, config)
     _require_state(layout)
     print(
@@ -763,7 +797,7 @@ def serial(args: Any) -> int:
 
 
 def console(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
+    _root, config = _load_args(args)
     layout = ProjectLayout(_root, config)
     _require_state(layout)
     print(
@@ -774,7 +808,7 @@ def console(args: Any) -> int:
 
 
 def log(args: Any) -> int:
-    _root, config = load_project(getattr(args, "directory", None))
+    _root, config = _load_args(args)
     layout = ProjectLayout(_root, config)
     return show_log(
         layout.serial_log,
@@ -785,7 +819,7 @@ def log(args: Any) -> int:
 
 
 def clean(args: Any) -> int:
-    root, config = load_project(getattr(args, "directory", None))
+    root, config = _load_args(args)
     layout = ProjectLayout(root, config)
     stop(args)
     _cleanup_socket_dir(layout)

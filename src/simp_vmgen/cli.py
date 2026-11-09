@@ -9,7 +9,7 @@ from collections.abc import Sequence
 import shtab
 
 from . import __version__
-from .compose import compose_dispatch
+from .compose_runtime import compose_dispatch
 from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .kernel import kernel_dispatch
@@ -473,21 +473,86 @@ def _add_compose(subparsers: argparse._SubParsersAction) -> None:
     p = subparsers.add_parser(
         "compose",
         help="manage multi-VM compose projects",
-        description="Validate and inspect a vmgen-compose.toml project.",
+        description="Build, run and inspect a vmgen-compose.toml project.",
     )
     _add_common_directory(p)
     compose_sub = p.add_subparsers(dest="compose_command", metavar="COMMAND")
+
     validate = compose_sub.add_parser(
         "validate",
         help="validate a compose project and its service projects",
     )
     _add_common_directory(validate)
+
     show = compose_sub.add_parser(
         "show",
         help="show the resolved compose topology",
     )
     _add_common_directory(show)
     show.add_argument("--json", action="store_true", help="machine-readable output")
+
+    build = compose_sub.add_parser("build", help="build all service projects")
+    _add_common_directory(build)
+    build.add_argument("--force", action="store_true", help="rebuild service artifacts")
+
+    up = compose_sub.add_parser("up", help="build if needed, start and wait for all services")
+    _add_common_directory(up)
+    up.add_argument(
+        "--no-build",
+        action="store_true",
+        help="start existing artifacts without running build",
+    )
+    up.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
+    up.add_argument("--json", action="store_true", help="machine-readable output")
+
+    status = compose_sub.add_parser("status", help="show compose service status")
+    _add_common_directory(status)
+    status.add_argument("--json", action="store_true", help="machine-readable output")
+    status.add_argument(
+        "--check",
+        action="store_true",
+        help="exit 3 unless every service is running",
+    )
+
+    wait = compose_sub.add_parser("wait", help="wait for all services to become ready")
+    _add_common_directory(wait)
+    wait.add_argument("--timeout", type=int, default=None, metavar="SECONDS")
+    wait.add_argument("--json", action="store_true", help="machine-readable output")
+
+    guest = compose_sub.add_parser("guest", help="run a command in one service")
+    _add_common_directory(guest)
+    guest.add_argument("service", metavar="SERVICE")
+    guest.add_argument("-u", "--user", metavar="NAME")
+    guest.add_argument("--timeout", type=float, default=None, metavar="SECONDS")
+    guest.add_argument(
+        "guest_command",
+        nargs=argparse.REMAINDER,
+        metavar="CMD",
+        help="command to run (use -- before CMD)",
+    )
+
+    logs = compose_sub.add_parser("logs", help="show or follow one service serial log")
+    _add_common_directory(logs)
+    logs.add_argument("service", metavar="SERVICE")
+    logs.add_argument(
+        "-f",
+        "--follow",
+        action="store_true",
+        help="follow the log (blocks until interrupted)",
+    )
+    logs.add_argument("--lines", type=int, default=80, metavar="N")
+    logs.add_argument("--no-color", action="store_true", help="strip ANSI escape sequences")
+
+    stop = compose_sub.add_parser("stop", help="stop all compose services")
+    _add_common_directory(stop)
+    stop.add_argument("--json", action="store_true", help="machine-readable output")
+
+    down = compose_sub.add_parser(
+        "down",
+        help="stop all services and release compose network state",
+    )
+    _add_common_directory(down)
+    down.add_argument("--json", action="store_true", help="machine-readable output")
 
 
 def _add_completion(subparsers: argparse._SubParsersAction) -> None:

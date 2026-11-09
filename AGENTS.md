@@ -19,6 +19,7 @@ Supported:
 - Ubuntu 24.04 and Alpine 3.22 cloud images
 - cloud-init provisioning, SSH, serial console, 9p volumes
 - multiple experimental NICs on rootless QEMU socket LANs
+- compose projects for building and running multiple VMs together
 - multiple users, root/password/key policy
 - kernel source fetch from a version or git commit
 - non-interactive kernel configuration and builds
@@ -28,7 +29,7 @@ Supported:
 Out of scope:
 
 - interactive kernel development workflows (`menuconfig`, patches, IDE setup)
-- multi-VM orchestration
+- multi-VM scheduling beyond compose (`depends_on`, cross-host, app health)
 - non-x86 architectures
 - automatic module/initrd synthesis for externally supplied kernels
 - replacing tools such as `virtme-ng`
@@ -72,6 +73,7 @@ src/simp_vmgen/
 ├── mounts.py         resolved 9p mounts
 ├── network.py        resolved experimental NICs and cloud-init network config
 ├── compose.py        compose topology, endpoint registry and service state
+├── compose_runtime.py compose lifecycle over the single-VM runtime
 ├── sshkeys.py        key generation and askpass helper
 ├── net.py            free-port allocation
 ├── layout.py         `.simp-vmgen/` paths

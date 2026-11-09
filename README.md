@@ -205,16 +205,20 @@ validation rules, guest configuration and current limitations.
 
 ## Compose projects
 
-A compose project groups several VM projects and shared experimental networks:
+A compose project groups several VM projects and shared experimental networks.
+Compose can validate, build, start, inspect, stop and tear down the group:
 
 ```sh
 simp-vmgen compose validate
-simp-vmgen compose show --json
+simp-vmgen compose up --timeout 300
+simp-vmgen compose status --json
+simp-vmgen compose guest attacker -- ping -c 3 192.168.77.20
+simp-vmgen compose down
 ```
 
-This release only parses, validates and displays the topology. Lifecycle
-commands and bridge/TAP networking are planned. See
-[docs/compose.md](docs/compose.md) for the file format and current limits.
+Bridge/TAP networking is still planned. See
+[docs/compose.md](docs/compose.md) for the file format, lifecycle semantics and
+current limits.
 
 ## Inspecting a project
 

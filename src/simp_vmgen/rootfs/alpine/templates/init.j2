@@ -12,6 +12,11 @@ hostname {{ hostname | shquote }}
 for module in 9p 9pnet_virtio virtio_net; do
     modprobe "$module" 2>/dev/null || true
 done
+{% for network in networks %}
+for iface in /sys/class/net/*; do
+    [ "$(cat "$iface/address" 2>/dev/null)" = {{ network.mac | shquote }} ] && ip link set dev "${iface##*/}" name {{ network.name | shquote }} 2>/dev/null || true
+done
+{% endfor %}
 {% for mount in mounts %}
 mkdir -p {{ mount.target | shquote }}
 mount -t 9p -o trans=virtio,version=9p2000.L{{ ",ro" if mount.readonly else "" }} {{ mount.tag | shquote }} {{ mount.target | shquote }} || echo "simp-vmgen: failed to mount {{ mount.tag }}" > /dev/console

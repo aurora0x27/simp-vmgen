@@ -13,6 +13,7 @@ from typing import Any
 from .config import Config
 from .errors import ProjectError
 from .layout import ProjectLayout
+from .network import network_fingerprint
 
 STAMP_SCHEMA_VERSION = 1
 STAMP_FILENAME = "build.json"
@@ -28,7 +29,11 @@ _SIZE_MULTIPLIERS = {
 
 
 def config_digest(config: Config) -> str:
-    return hashlib.sha256(config.dumps().encode("utf-8")).hexdigest()
+    payload = config.dumps()
+    networks = network_fingerprint(config)
+    if networks:
+        payload += json.dumps(networks, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _size_bytes(value: str) -> int | None:

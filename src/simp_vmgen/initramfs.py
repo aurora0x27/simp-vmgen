@@ -20,6 +20,7 @@ from .config import Config
 from .errors import ProjectError
 from .layout import ProjectLayout
 from .mounts import resolve_mounts
+from .network import resolve_networks
 from .paths import load_project
 from .rootfs import RootfsSpec, load_rootfs
 from .rootfs_source import update_lock as update_rootfs_lock
@@ -156,6 +157,7 @@ def _build_busybox(
             tool_version=__version__,
             hostname=config.project.hostname,
             mounts=mounts,
+            networks=resolve_networks(config),
             ready_marker=f"{READY_MARKER} name={config.project.hostname}",
         )
     )

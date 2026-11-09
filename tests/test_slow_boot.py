@@ -10,7 +10,7 @@ import pytest
 
 from simp_vmgen import runtime
 from simp_vmgen.cli import main
-from simp_vmgen.config import Config
+from simp_vmgen.config import Config, NetworkConfig
 
 pytestmark = [
     pytest.mark.slow,
@@ -65,6 +65,63 @@ def test_alpine_cloud_image_boot(tmp_path: Path) -> None:
         assert runtime.guest(_args(root, guest_command=["sh", "-c", "uname -s"])) == 0
     finally:
         _stop(root)
+
+
+def test_mixed_cloud_network(tmp_path: Path) -> None:
+    if shutil.which("qemu-system-x86_64") is None or shutil.which("qemu-img") is None:
+        pytest.skip("QEMU is not installed")
+    if not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")):
+        pytest.skip("no cloud-init seed tool")
+
+    nodes = {
+        "ubuntu": ("192.168.88.10/24", "192.168.88.11"),
+        "alpine": ("192.168.88.11/24", "192.168.88.10"),
+    }
+    roots: dict[str, Path] = {}
+    for distro, (address, _peer) in nodes.items():
+        root = tmp_path / distro
+        roots[distro] = root
+        assert (
+            main(
+                [
+                    "new",
+                    str(root),
+                    "--distro",
+                    distro,
+                    "--mem",
+                    "1G",
+                    "--cpus",
+                    "1",
+                ]
+            )
+            == 0
+        )
+        config = Config.load(root / "vmgen.toml")
+        config.provision.package_sets = []
+        config.networks = [NetworkConfig("lan", address=address, mcast="239.192.88.1:4789")]
+        config.validate()
+        config.save(root / "vmgen.toml")
+
+    try:
+        for root in roots.values():
+            assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+        for root in roots.values():
+            assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
+        for root in roots.values():
+            assert runtime.wait(_args(root, timeout=300)) == 0
+        for distro, (_address, peer) in nodes.items():
+            assert (
+                runtime.guest(
+                    _args(
+                        roots[distro],
+                        guest_command=["ping", "-c", "3", "-W", "2", peer],
+                    )
+                )
+                == 0
+            )
+    finally:
+        for root in roots.values():
+            _stop(root)
 
 
 def test_alpine_rootfs_with_kernel_artifact(tmp_path: Path) -> None:

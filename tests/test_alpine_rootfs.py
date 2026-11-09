@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from simp_vmgen import alpine
-from simp_vmgen.config import Config, KernelConfig, UserConfig
+from simp_vmgen.config import Config, KernelConfig, NetworkConfig, UserConfig
 from simp_vmgen.layout import ProjectLayout
 from simp_vmgen.rootfs import load_rootfs
 from simp_vmgen.rootfs_source import RootfsSourceInfo
@@ -68,6 +69,14 @@ def _config(tmp_path: Path) -> Config:
     ]
     config.provision.package_sets = []
     config.kernel = KernelConfig(enabled=True, version="6.1.0", rootfs="alpine")
+    config.networks = [
+        NetworkConfig(
+            "lan",
+            address="192.168.77.10/24",
+            gateway="192.168.77.1",
+            mcast="239.192.77.1:4789",
+        )
+    ]
     config.validate()
     return config
 
@@ -112,6 +121,14 @@ def test_prepare_alpine_rootfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert init.stat().st_mode & 0o111
     assert "/work" in init.read_text()
     assert "exec /sbin/init" in init.read_text()
+    assert config.networks[0].effective_mac("lab") in init.read_text()
+    assert "name lan" in init.read_text()
+    interfaces = (root / "etc/network/interfaces").read_text()
+    assert "auto lan" in interfaces
+    assert "iface lan inet static" in interfaces
+    assert "address 192.168.77.10/24" in interfaces
+    assert "gateway 192.168.77.1" in interfaces
+    assert shutil.which("sh") is None or subprocess.run(["sh", "-n", str(init)]).returncode == 0
     assert (root / "etc/runlevels/default/sshd").is_symlink()
     assert (root / "etc/runlevels/default/simp-vmgen-ready").is_symlink()
     assert "ttyS0::respawn" in (root / "etc/inittab").read_text()

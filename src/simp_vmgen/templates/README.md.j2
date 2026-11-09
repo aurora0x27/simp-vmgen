@@ -32,6 +32,17 @@ you pass `--force`.
 - Kernel rootfs: `{{ config.kernel.rootfs }}`{% if config.kernel.initrd %}, initrd `{{ config.kernel.initrd }}`{% endif %}
 {% endif %}
 
+{% if config.networks %}
+## Experimental networks
+
+These interfaces use the rootless QEMU socket multicast backend. The first
+user-mode NIC remains the management interface for SSH and outbound access.
+
+{% for network in config.networks %}
+- `{{ network.name }}`: {% if network.dhcp %}DHCP{% else %}`{{ network.address }}`{% if network.gateway %}, gateway `{{ network.gateway }}`{% endif %}{% endif %}, MAC `{{ network.effective_mac(config.project.name) }}`, multicast `{{ network.mcast }}`
+{% endfor %}
+
+{% endif %}
 ## Users
 
 {% for user in config.users %}

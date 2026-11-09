@@ -107,6 +107,58 @@ readonly = false
 - Each mount becomes a 9p share with a stable `host0`, `host1`, ... tag.
 - `readonly = true` sets the 9p share and guest mount to read-only.
 
+## Experimental networks
+
+Extra network interfaces let a VM join a shared lab network. Each `[[network]]`
+table adds one NIC after the normal user-mode management NIC:
+
+```toml
+[[network]]
+name = "lan"
+address = "192.168.77.10/24"
+gateway = "192.168.77.1"          # optional
+mcast = "239.192.77.1:4789"
+
+[[network]]
+name = "back"
+dhcp = true
+mcast = "239.192.77.2:4789"
+```
+
+- `name` must be a valid interface name: lowercase letter followed by lowercase
+  letters, digits, `_` or `-`, at most 15 characters. `lo` and `eth0` are
+  reserved.
+- `mcast` is a QEMU socket UDP multicast endpoint. All VMs using the same
+  endpoint share one Ethernet segment. The transport is restricted to
+  `127.0.0.1`, so it stays on the host and requires no root privileges.
+- Use either a static `address` (IPv4 CIDR) or `dhcp = true`; they are mutually
+  exclusive. IPv4 is supported; IPv6 is not configured yet.
+- `gateway` is optional, must belong to the static subnet, and only one
+  experimental network may set it. It becomes a default route and may override
+  the management NIC's DHCP route; omit it unless the VM is meant to route
+  through the lab network.
+- `mac` may be set explicitly. When omitted, a stable locally administered MAC
+  is derived from the project and network name. Network names, MACs, addresses
+  and multicast endpoints must be unique within a project. Derived MACs assume
+  project names are unique on the same segment; set `mac` explicitly if you
+  clone a project.
+- The normal management NIC is unchanged and still provides SSH and outbound
+  access through QEMU user-mode networking. Experiment traffic uses the extra
+  interfaces.
+- Cloud-init guests receive a NoCloud `network-config` file that matches
+  interfaces by MAC. It also keeps the management NIC on DHCP using a stable
+  management MAC. The Alpine rootfs renames interfaces to their network name
+  during init and configures them with ifupdown-ng. The busybox rootfs renames
+  them and configures addresses with `ip`.
+- Kernel builds enable `CONFIG_VIRTIO_NET`, `CONFIG_INET`, `CONFIG_PACKET` and
+  `CONFIG_UNIX` by default. External kernel artifacts and
+  `kernel.rootfs = "none"` are not modified: if the kernel lacks virtio-net or
+  the matching modules, the extra NICs will not appear. Configure networking
+  inside those images yourself.
+
+Bridge/TAP backends and compose orchestration are not implemented yet. The
+current backend only creates the QEMU socket link and guest configuration.
+
 ## Provisioning
 
 | Key | Meaning |

@@ -18,6 +18,7 @@ from .config import Config
 from .distros import Distro
 from .errors import ProjectError
 from .mounts import resolve_mounts
+from .network import cloud_init_network_config
 from .users import provision_users
 
 READY_MARKER = "SIMP_VMGEN_READY"
@@ -29,6 +30,7 @@ class SeedArtifacts:
     meta_data: Path
     instance_id: str
     seed_iso: Path | None
+    network_config: Path | None = None
 
 
 @lru_cache(maxsize=1)
@@ -114,29 +116,40 @@ def render_cloud_init(
     if extra:
         user_data = f"{user_data.rstrip()}\n\n# extra user data\n{extra.rstrip()}\n"
 
-    instance_id = f"{config.project.hostname}-{hashlib.sha256(user_data.encode()).hexdigest()[:12]}"
+    network_config = cloud_init_network_config(config)
+    hash_input = user_data if not network_config else f"{user_data}\n{network_config}"
+    instance_id = (
+        f"{config.project.hostname}-{hashlib.sha256(hash_input.encode()).hexdigest()[:12]}"
+    )
     context["instance_id"] = instance_id
     meta_data = env.get_template(f"{template_dir}/meta-data.j2").render(**context)
 
     cloud_dir = run_dir / "cloud-init"
     user_data_path = cloud_dir / "user-data"
     meta_data_path = cloud_dir / "meta-data"
+    network_config_path: Path | None = None
     _write(user_data_path, user_data)
     _write(meta_data_path, meta_data)
+    if network_config:
+        network_config_path = cloud_dir / "network-config"
+        _write(network_config_path, network_config)
 
     seed_iso: Path | None = None
     if make_iso:
         seed_iso = run_dir / "seed.iso"
-        _make_seed_iso(seed_iso, user_data_path, meta_data_path)
+        _make_seed_iso(seed_iso, user_data_path, meta_data_path, network_config_path)
     return SeedArtifacts(
         user_data=user_data_path,
         meta_data=meta_data_path,
         instance_id=instance_id,
         seed_iso=seed_iso,
+        network_config=network_config_path,
     )
 
 
-def _make_seed_iso(seed_iso: Path, user_data: Path, meta_data: Path) -> None:
+def _make_seed_iso(
+    seed_iso: Path, user_data: Path, meta_data: Path, network_config: Path | None = None
+) -> None:
     seed_iso.unlink(missing_ok=True)
     xorriso = shutil.which("xorriso")
     cloud_localds = shutil.which("cloud-localds")
@@ -157,13 +170,13 @@ def _make_seed_iso(seed_iso: Path, user_data: Path, meta_data: Path) -> None:
             str(user_data),
             str(meta_data),
         ]
+        if network_config is not None:
+            command.append(str(network_config))
     elif cloud_localds:
-        command = [
-            cloud_localds,
-            str(seed_iso),
-            str(user_data),
-            str(meta_data),
-        ]
+        command = [cloud_localds]
+        if network_config is not None:
+            command.append(f"--network-config={network_config}")
+        command += [str(seed_iso), str(user_data), str(meta_data)]
     elif genisoimage:
         command = [
             genisoimage,
@@ -177,6 +190,8 @@ def _make_seed_iso(seed_iso: Path, user_data: Path, meta_data: Path) -> None:
             str(user_data),
             str(meta_data),
         ]
+        if network_config is not None:
+            command.append(str(network_config))
     else:
         raise ProjectError(
             "no cloud-init seed tool found (install xorriso, cloud-image-utils or genisoimage)"

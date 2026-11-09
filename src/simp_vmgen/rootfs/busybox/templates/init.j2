@@ -11,6 +11,21 @@ mount -t tmpfs tmpfs /run 2>/dev/null || true
 hostname {{ hostname | shquote }}
 modprobe 9p 2>/dev/null || true
 modprobe 9pnet_virtio 2>/dev/null || true
+modprobe virtio_net 2>/dev/null || true
+{% for network in networks %}
+for iface in /sys/class/net/*; do
+    [ "$(cat "$iface/address" 2>/dev/null)" = {{ network.mac | shquote }} ] && ip link set dev "${iface##*/}" name {{ network.name | shquote }} 2>/dev/null || true
+done
+ip link set dev {{ network.name | shquote }} up
+{% if network.dhcp %}
+udhcpc -i {{ network.name | shquote }} -b
+{% else %}
+ip addr add {{ network.address | shquote }} dev {{ network.name | shquote }}
+{% if network.gateway %}
+ip route add default via {{ network.gateway | shquote }}
+{% endif %}
+{% endif %}
+{% endfor %}
 {% for mount in mounts %}
 mkdir -p {{ mount.target | shquote }}
 mount -t 9p -o trans=virtio,version=9p2000.L{{ ",ro" if mount.readonly else "" }} {{ mount.tag | shquote }} {{ mount.target | shquote }} || echo "simp-vmgen: failed to mount {{ mount.tag }}" > /dev/console

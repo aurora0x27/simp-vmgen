@@ -186,6 +186,22 @@ readonly = true
 Relative sources are resolved from the project root. Each mount becomes a 9p
 share (`host0`, `host1`, ...) and is mounted in the guest by cloud-init.
 
+## Experimental networks
+
+Extra NICs can join a rootless QEMU socket LAN shared by other local VMs:
+
+```toml
+[[network]]
+name = "lan"
+address = "192.168.77.10/24"
+mcast = "239.192.77.1:4789"
+```
+
+All VMs using the same `mcast` endpoint share one Ethernet segment. The
+management NIC stays on user-mode networking for SSH and outbound access. See
+[docs/configuration.md](docs/configuration.md#experimental-networks) for
+validation rules, guest configuration and current limitations.
+
 ## Inspecting a project
 
 ```sh

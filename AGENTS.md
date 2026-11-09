@@ -18,6 +18,7 @@ Supported:
 
 - Ubuntu 24.04 and Alpine 3.22 cloud images
 - cloud-init provisioning, SSH, serial console, 9p volumes
+- multiple experimental NICs on rootless QEMU socket LANs
 - multiple users, root/password/key policy
 - kernel source fetch from a version or git commit
 - non-interactive kernel configuration and builds
@@ -69,6 +70,7 @@ src/simp_vmgen/
 ├── seed.py           cloud-init rendering and NoCloud ISO creation
 ├── users.py          user/SSH-key provisioning data
 ├── mounts.py         resolved 9p mounts
+├── network.py        resolved experimental NICs and cloud-init network config
 ├── sshkeys.py        key generation and askpass helper
 ├── net.py            free-port allocation
 ├── layout.py         `.simp-vmgen/` paths

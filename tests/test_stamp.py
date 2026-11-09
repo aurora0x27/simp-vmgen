@@ -10,7 +10,7 @@ import pytest
 
 from simp_vmgen import runtime, stamp
 from simp_vmgen.cli import main
-from simp_vmgen.config import Config, KernelConfig
+from simp_vmgen.config import Config, KernelConfig, NetworkConfig
 from simp_vmgen.errors import ProjectError
 
 
@@ -72,6 +72,28 @@ def test_run_rejects_config_changes_since_build(
     assert runtime.build(_args(root, dry_run=False, force=False)) == 0
     stamp.require_cloud_artifacts(config, layout)
     assert runtime.run(_args(root, dry_run=True, foreground=False, snapshot=False)) == 0
+
+
+@pytest.mark.skipif(
+    shutil.which("qemu-img") is None
+    or not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")),
+    reason="qemu-img or seed tool missing",
+)
+def test_run_rejects_network_changes_since_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _base = _cloud_project(tmp_path, monkeypatch)
+    config = Config.load(root / "vmgen.toml")
+    config.networks = [NetworkConfig("lan", address="192.168.77.10/24", mcast="239.192.77.1:4789")]
+    config.validate()
+    config.save(root / "vmgen.toml")
+
+    layout = runtime.ProjectLayout(root, config)
+    with pytest.raises(ProjectError, match="configuration changed"):
+        stamp.require_cloud_artifacts(config, layout)
+
+    assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+    stamp.require_cloud_artifacts(config, layout)
 
 
 @pytest.mark.skipif(

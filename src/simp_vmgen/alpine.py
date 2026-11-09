@@ -19,6 +19,7 @@ from .distros import Distro, load_distro
 from .errors import ProjectError
 from .layout import ProjectLayout
 from .mounts import resolve_mounts
+from .network import resolve_networks
 from .rootfs import RootfsSpec, load_rootfs
 from .rootfs_source import RootfsSourceInfo, fetch_rootfs
 from .runner import run_streaming
@@ -270,10 +271,19 @@ def _write_ssh_config(config: Config, rootfs: Path, *, ssh_pwauth: bool) -> None
 
 def _write_network(config: Config, rootfs: Path) -> None:
     _write(rootfs / "etc" / "hostname", f"{config.project.hostname}\n")
-    _write(
-        rootfs / "etc" / "network" / "interfaces",
-        "auto lo\niface lo inet loopback\n\nauto eth0\niface eth0 inet dhcp\n",
-    )
+    lines = ["auto lo", "iface lo inet loopback", "", "auto eth0", "iface eth0 inet dhcp"]
+    for network in resolve_networks(config):
+        lines += ["", f"auto {network.name}"]
+        if network.dhcp:
+            lines.append(f"iface {network.name} inet dhcp")
+        else:
+            lines += [
+                f"iface {network.name} inet static",
+                f"    address {network.address}",
+            ]
+            if network.gateway:
+                lines.append(f"    gateway {network.gateway}")
+    _write(rootfs / "etc" / "network" / "interfaces", "\n".join(lines) + "\n")
 
 
 def _write_init(config: Config, layout: ProjectLayout, rootfs: Path) -> None:
@@ -286,6 +296,7 @@ def _write_init(config: Config, layout: ProjectLayout, rootfs: Path) -> None:
             tool_version=__version__,
             hostname=config.project.hostname,
             mounts=mounts,
+            networks=resolve_networks(config),
         )
     )
     _write(rootfs / "init", content, mode=0o755)

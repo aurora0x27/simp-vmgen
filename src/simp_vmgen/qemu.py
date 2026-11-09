@@ -10,6 +10,7 @@ from .distros import Distro, DistroRelease
 from .errors import ProjectError
 from .layout import ProjectLayout
 from .mounts import resolve_mounts
+from .network import management_mac, resolve_networks
 
 
 def kvm_available() -> bool:
@@ -106,7 +107,17 @@ def build_argv(
     netdev = "user,id=n0"
     if config.ssh.enabled:
         netdev += f",hostfwd=tcp:{config.ssh.host}:{ssh_port}-:22"
-    argv += ["-netdev", netdev, "-device", "virtio-net-pci,netdev=n0"]
+    management_device = "virtio-net-pci,netdev=n0"
+    if config.networks:
+        management_device += f",mac={management_mac(config)}"
+    argv += ["-netdev", netdev, "-device", management_device]
+    for network in resolve_networks(config):
+        argv += [
+            "-netdev",
+            f"socket,id={network.qemu_id},mcast={network.mcast},localaddr=127.0.0.1",
+            "-device",
+            f"virtio-net-pci,netdev={network.qemu_id},mac={network.mac}",
+        ]
     argv += ["-device", "virtio-rng-pci"]
 
     if config.vm.display == "none":

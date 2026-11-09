@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from simp_vmgen import kernel, qemu
-from simp_vmgen.config import Config, KernelConfig
+from simp_vmgen.config import Config, KernelConfig, NetworkConfig
 from simp_vmgen.distros import load_distro
 from simp_vmgen.layout import ProjectLayout
 from simp_vmgen.mounts import ResolvedMount
@@ -67,6 +67,24 @@ def test_cloudimg_kvm_gdb_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
             gdb_port=1234,
             foreground=True,
         ),
+    )
+
+
+def test_cloudimg_networks_tcg_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = Config.default("golden")
+    config.networks = [
+        NetworkConfig(
+            "lan",
+            address="192.168.77.10/24",
+            gateway="192.168.77.1",
+            mcast="239.192.77.1:4789",
+        ),
+        NetworkConfig("back", dhcp=True, mcast="239.192.77.2:4789"),
+    ]
+    config.validate()
+    _assert_snapshot(
+        "cloudimg-networks-tcg.args",
+        _argv(monkeypatch, config, kvm=False, ssh_port=2222),
     )
 
 

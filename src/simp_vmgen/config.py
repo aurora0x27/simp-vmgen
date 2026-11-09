@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import ipaddress
 import os
 import posixpath
 import re
@@ -28,6 +30,9 @@ _SIZE_RE = re.compile(r"^([1-9][0-9]*)([KMGT])?$", re.IGNORECASE)
 _CONFIG_OPTION_RE = re.compile(r"^CONFIG_[A-Za-z0-9_]+$")
 _KERNEL_VERSION_RE = re.compile(r"^\d+\.\d+(\.\d+)?$")
 _KERNEL_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_NETWORK_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,14}$")
+_MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
+_RESERVED_NETWORK_NAMES = {"lo", "eth0", "mgmt"}
 
 _VM_ACCELS = {"auto", "kvm", "tcg"}
 _VM_DISPLAYS = {"none", "gtk", "sdl", "vnc"}
@@ -158,6 +163,68 @@ def _absolute_target(value: str, where: str) -> str:
     return target
 
 
+def derive_mac(project: str, name: str) -> str:
+    digest = hashlib.sha256(f"{project}\0{name}".encode()).digest()
+    return ":".join(f"{octet:02x}" for octet in (0x02, *digest[:5]))
+
+
+def _network_name(value: str, where: str) -> str:
+    if _NETWORK_NAME_RE.match(value) is None:
+        raise ConfigError(
+            f"{where}: invalid network name {value!r} "
+            "(lowercase letter followed by letters, digits, '_' or '-', max 15 chars)"
+        )
+    if value in _RESERVED_NETWORK_NAMES:
+        raise ConfigError(f"{where}: network name {value!r} is reserved")
+    return value
+
+
+def _ipv4_interface(value: str, where: str) -> str:
+    if "/" not in value:
+        raise ConfigError(f"{where}: expected an IPv4 CIDR such as 192.168.77.10/24")
+    try:
+        interface = ipaddress.IPv4Interface(value)
+    except ValueError as exc:
+        raise ConfigError(f"{where}: invalid IPv4 address {value!r}") from exc
+    if interface.ip.is_unspecified or interface.ip.is_loopback or interface.ip.is_multicast:
+        raise ConfigError(f"{where}: address must be a unicast host address")
+    return str(interface)
+
+
+def _ipv4_address(value: str, where: str) -> str:
+    try:
+        address = ipaddress.IPv4Address(value)
+    except ValueError as exc:
+        raise ConfigError(f"{where}: invalid IPv4 address {value!r}") from exc
+    if address.is_unspecified or address.is_loopback or address.is_multicast:
+        raise ConfigError(f"{where}: address must be a unicast host address")
+    return str(address)
+
+
+def _mac_address(value: str, where: str) -> str:
+    normalized = value.lower()
+    if _MAC_RE.match(normalized) is None:
+        raise ConfigError(f"{where}: invalid MAC address {value!r}")
+    if int(normalized[:2], 16) & 1:
+        raise ConfigError(f"{where}: MAC address must be unicast")
+    return normalized
+
+
+def _multicast_endpoint(value: str, where: str) -> str:
+    host, separator, port = value.rpartition(":")
+    if not separator:
+        raise ConfigError(f"{where}: expected a multicast endpoint such as 239.192.77.1:4789")
+    try:
+        address = ipaddress.IPv4Address(host)
+    except ValueError as exc:
+        raise ConfigError(f"{where}: invalid multicast address {host!r}") from exc
+    if not address.is_multicast:
+        raise ConfigError(f"{where}: {address} is not a multicast address")
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ConfigError(f"{where}: invalid UDP port {port!r}")
+    return f"{address}:{int(port)}"
+
+
 @dataclass(slots=True)
 class ProjectConfig:
     name: str
@@ -233,6 +300,19 @@ class MountConfig:
 
 
 @dataclass(slots=True)
+class NetworkConfig:
+    name: str
+    address: str = ""
+    gateway: str = ""
+    dhcp: bool = False
+    mac: str = ""
+    mcast: str = ""
+
+    def effective_mac(self, project: str) -> str:
+        return self.mac or derive_mac(project, self.name)
+
+
+@dataclass(slots=True)
 class UserConfig:
     name: str
     password: str = ""
@@ -282,6 +362,7 @@ class Config:
     gdb: GdbConfig = field(default_factory=GdbConfig)
     mounts: list[MountConfig] = field(default_factory=lambda: [MountConfig("work", "/work")])
     users: list[UserConfig] = field(default_factory=lambda: [UserConfig("root", password="114514")])
+    networks: list[NetworkConfig] = field(default_factory=list)
     provision: ProvisionConfig = field(default_factory=ProvisionConfig)
     kernel: KernelConfig = field(default_factory=KernelConfig)
 
@@ -325,6 +406,7 @@ class Config:
                 "gdb",
                 "mount",
                 "users",
+                "network",
                 "provision",
                 "kernel",
             },
@@ -414,6 +496,7 @@ class Config:
 
         mounts = _parse_mounts(data.get("mount"), f"{source}.mount")
         users = _parse_users(data.get("users"), f"{source}.users")
+        networks = _parse_networks(data.get("network"), f"{source}.network")
 
         provision_table = _table(data.get("provision"), f"{source}.provision")
         _unknown_keys(
@@ -499,6 +582,7 @@ class Config:
             gdb=gdb,
             mounts=mounts,
             users=users,
+            networks=networks,
             provision=provision,
             kernel=kernel,
         )
@@ -587,6 +671,51 @@ class Config:
                 if mount.tag in seen_tags:
                     raise ConfigError(f"{where}.tag: duplicate tag {mount.tag!r}")
                 seen_tags.add(mount.tag)
+
+        seen_network_names: set[str] = set()
+        seen_network_macs: set[str] = {derive_mac(self.project.name, "mgmt")}
+        seen_network_addresses: set[str] = set()
+        seen_network_mcast: set[str] = set()
+        seen_gateway = False
+        for index, network in enumerate(self.networks):
+            where = f"{source}.network[{index}]"
+            network.name = _network_name(network.name, f"{where}.name")
+            if network.name in seen_network_names:
+                raise ConfigError(f"{where}.name: duplicate network {network.name!r}")
+            seen_network_names.add(network.name)
+            effective_mac = _mac_address(
+                network.mac or network.effective_mac(self.project.name), f"{where}.mac"
+            )
+            if effective_mac in seen_network_macs:
+                raise ConfigError(f"{where}.mac: duplicate MAC address {effective_mac!r}")
+            seen_network_macs.add(effective_mac)
+            network.mcast = _multicast_endpoint(network.mcast, f"{where}.mcast")
+            if network.mcast in seen_network_mcast:
+                raise ConfigError(f"{where}.mcast: duplicate multicast endpoint {network.mcast!r}")
+            seen_network_mcast.add(network.mcast)
+            if network.dhcp:
+                if network.address or network.gateway:
+                    raise ConfigError(f"{where}: dhcp networks cannot set address or gateway")
+            else:
+                if not network.address:
+                    raise ConfigError(f"{where}.address: required when dhcp is false")
+                network.address = _ipv4_interface(network.address, f"{where}.address")
+                host = ipaddress.IPv4Interface(network.address).ip
+                if str(host) in seen_network_addresses:
+                    raise ConfigError(f"{where}.address: duplicate address {host}")
+                seen_network_addresses.add(str(host))
+                if network.gateway:
+                    if seen_gateway:
+                        raise ConfigError(
+                            f"{where}.gateway: only one experimental network may set a gateway"
+                        )
+                    seen_gateway = True
+                    network.gateway = _ipv4_address(network.gateway, f"{where}.gateway")
+                    if (
+                        ipaddress.IPv4Address(network.gateway)
+                        not in ipaddress.IPv4Interface(network.address).network
+                    ):
+                        raise ConfigError(f"{where}.gateway: must be inside {network.address}")
 
         if not self.provision.timezone.strip():
             raise ConfigError(f"{source}.provision.timezone: must not be empty")
@@ -753,6 +882,22 @@ class Config:
                 item["ssh_keys"] = list(user.ssh_keys)
             users.append(item)
 
+        networks: list[dict[str, Any]] = []
+        for network in self.networks:
+            network_item: dict[str, Any] = {
+                "name": network.name,
+                "mcast": network.mcast,
+            }
+            if network.dhcp:
+                network_item["dhcp"] = True
+            else:
+                network_item["address"] = network.address
+                if network.gateway:
+                    network_item["gateway"] = network.gateway
+            if network.mac:
+                network_item["mac"] = network.mac
+            networks.append(network_item)
+
         provision: dict[str, Any] = {
             "timezone": self.provision.timezone,
             "package_sets": list(self.provision.package_sets),
@@ -810,6 +955,7 @@ class Config:
             "provision": provision,
             "kernel": kernel,
             "mount": mounts,
+            "network": networks,
         }
         return data
 
@@ -817,6 +963,7 @@ class Config:
         data = self.to_dict()
         mount = data.pop("mount")
         users = data.pop("users")
+        network = data.pop("network")
 
         chunks: list[str] = [f"schema = {self.schema}\n"]
         if not mount:
@@ -827,6 +974,8 @@ class Config:
             chunks.append(_dump_array_table("mount", mount_item))
         for user in users:
             chunks.append(_dump_array_table("users", user))
+        for network_item in network:
+            chunks.append(_dump_array_table("network", network_item))
         for key in ("provision", "kernel"):
             chunks.append(_dump_named_table(key, data[key]))
 
@@ -872,6 +1021,34 @@ def _parse_mounts(value: Any, where: str) -> list[MountConfig]:
             )
         )
     return mounts
+
+
+def _parse_networks(value: Any, where: str) -> list[NetworkConfig]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ConfigError(f"{where}: expected an array of tables")
+    networks: list[NetworkConfig] = []
+    for index, item in enumerate(value):
+        item_where = f"{where}[{index}]"
+        if not isinstance(item, dict):
+            raise ConfigError(f"{item_where}: expected a table")
+        _unknown_keys(
+            item,
+            {"name", "address", "gateway", "dhcp", "mac", "mcast"},
+            item_where,
+        )
+        networks.append(
+            NetworkConfig(
+                name=_string(item, "name", item_where, required=True),
+                address=_string(item, "address", item_where),
+                gateway=_string(item, "gateway", item_where),
+                dhcp=_bool(item, "dhcp", item_where),
+                mac=_string(item, "mac", item_where),
+                mcast=_string(item, "mcast", item_where, required=True),
+            )
+        )
+    return networks
 
 
 def _parse_users(value: Any, where: str) -> list[UserConfig]:

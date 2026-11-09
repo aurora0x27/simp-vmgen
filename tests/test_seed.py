@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
-from simp_vmgen.config import Config, MountConfig, UserConfig
+from simp_vmgen.config import Config, MountConfig, NetworkConfig, UserConfig
 from simp_vmgen.distros import load_distro
 from simp_vmgen.errors import ProjectError
+from simp_vmgen.network import cloud_init_network_config
 from simp_vmgen.seed import render_cloud_init
 from simp_vmgen.users import resolve_ssh_keys
 
@@ -193,6 +195,47 @@ def test_resolve_ssh_keys(tmp_path: Path) -> None:
 def test_resolve_ssh_keys_missing_file(tmp_path: Path) -> None:
     with pytest.raises(ProjectError, match="cannot read"):
         resolve_ssh_keys([str(tmp_path / "missing.pub")], tmp_path)
+
+
+def test_network_config_changes_instance_id(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    distro = load_distro("ubuntu")
+    first = render_cloud_init(config, distro, tmp_path, tmp_path / "run1", make_iso=False)
+    assert first.network_config is None
+
+    config.networks = [NetworkConfig("lan", dhcp=True, mcast="239.192.77.1:4789")]
+    config.validate()
+    second = render_cloud_init(config, distro, tmp_path, tmp_path / "run2", make_iso=False)
+    assert second.network_config is not None
+    assert second.network_config.read_text() == cloud_init_network_config(config)
+    assert first.instance_id != second.instance_id
+
+
+@pytest.mark.skipif(shutil.which("xorriso") is None, reason="xorriso missing")
+def test_seed_iso_includes_network_config(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    config.networks = [NetworkConfig("lan", dhcp=True, mcast="239.192.77.1:4789")]
+    config.validate()
+    distro = load_distro("ubuntu")
+    artifacts = render_cloud_init(config, distro, tmp_path, tmp_path / "run", make_iso=True)
+    assert artifacts.seed_iso is not None
+    extracted = tmp_path / "network-config"
+    subprocess.run(
+        [
+            "xorriso",
+            "-osirrox",
+            "on",
+            "-indev",
+            str(artifacts.seed_iso),
+            "-extract",
+            "/network-config",
+            str(extracted),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert extracted.read_text() == artifacts.network_config.read_text()
 
 
 @pytest.mark.skipif(

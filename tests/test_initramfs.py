@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from simp_vmgen.config import Config, KernelConfig, MountConfig
+from simp_vmgen.config import Config, KernelConfig, MountConfig, NetworkConfig
 from simp_vmgen.initramfs import build_initramfs
 from simp_vmgen.layout import ProjectLayout
 
@@ -47,6 +47,33 @@ def test_build_initramfs(tmp_path: Path) -> None:
     assert "init" in listing
     assert "bin/busybox" in listing
     assert "etc/passwd" in listing
+
+
+@pytest.mark.skipif(shutil.which("cpio") is None, reason="cpio missing")
+def test_busybox_init_configures_networks(tmp_path: Path) -> None:
+    (tmp_path / "work").mkdir()
+    config = Config.default("lab")
+    config.kernel = KernelConfig(enabled=True, version="6.1.0")
+    config.networks = [
+        NetworkConfig(
+            "lan",
+            address="192.168.77.10/24",
+            gateway="192.168.77.1",
+            mcast="239.192.77.1:4789",
+        ),
+        NetworkConfig("back", dhcp=True, mcast="239.192.77.2:4789"),
+    ]
+    config.validate()
+    layout = ProjectLayout(tmp_path, config)
+    build_initramfs(config, layout, busybox_path=Path("/bin/true"), install_applets=False)
+    init = (layout.kernel_dir / "initramfs" / "init").read_text()
+    assert "02:" in init
+    assert "ip addr add 192.168.77.10/24" in init
+    assert "ip route add default via 192.168.77.1" in init
+    assert "udhcpc -i back -b" in init
+    assert "ip link set dev lan up" in init
+    syntax = subprocess.run(["sh", "-n", str(layout.kernel_dir / "initramfs" / "init")])
+    assert syntax.returncode == 0
 
 
 def test_initramfs_applet_symlinks_are_relative(tmp_path: Path) -> None:

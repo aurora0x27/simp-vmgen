@@ -75,6 +75,7 @@ static busybox initramfs by default.
 | `log` | Show or follow the serial log (`-f`, `--lines`, `--no-color`) |
 | `status` / `stop` / `clean` | Inspect, stop or remove runtime state; `status --json`, `--check` |
 | `kernel fetch/config/build/rootfs/initramfs/status/clean` | Kernel workflow; `status --json` |
+| `compose validate` / `compose show` | Validate or inspect a multi-VM compose topology |
 | `gdb` | Connect to the QEMU gdb stub |
 | `completion bash\|zsh\|fish` | Print a shell completion script |
 
@@ -201,6 +202,19 @@ All VMs using the same `mcast` endpoint share one Ethernet segment. The
 management NIC stays on user-mode networking for SSH and outbound access. See
 [docs/configuration.md](docs/configuration.md#experimental-networks) for
 validation rules, guest configuration and current limitations.
+
+## Compose projects
+
+A compose project groups several VM projects and shared experimental networks:
+
+```sh
+simp-vmgen compose validate
+simp-vmgen compose show --json
+```
+
+This release only parses, validates and displays the topology. Lifecycle
+commands and bridge/TAP networking are planned. See
+[docs/compose.md](docs/compose.md) for the file format and current limits.
 
 ## Inspecting a project
 

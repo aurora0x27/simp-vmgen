@@ -17,6 +17,7 @@ from typing import Any
 from . import stamp
 from .attach import attach_socket, show_log
 from .cache import download, images_dir
+from .compose import assert_standalone_allowed
 from .config import LOCK_FILENAME, Config
 from .distros import Distro, DistroRelease, load_distro
 from .errors import ProjectError
@@ -291,6 +292,7 @@ def _print_run_summary(
 
 def run(args: Any) -> int:
     root, config = load_project(getattr(args, "directory", None))
+    assert_standalone_allowed(root)
     distro, release = _load_distro(config)
     layout = ProjectLayout(root, config)
     layout.ensure()

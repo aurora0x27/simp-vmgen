@@ -9,6 +9,7 @@ from collections.abc import Sequence
 import shtab
 
 from . import __version__
+from .compose import compose_dispatch
 from .diagnose import diagnose
 from .errors import SimpVmgenError
 from .kernel import kernel_dispatch
@@ -49,6 +50,8 @@ def _dry_run_supported(args: argparse.Namespace) -> bool:
 def _command_label(args: argparse.Namespace) -> str:
     if args.command == "kernel" and getattr(args, "kernel_command", None):
         return f"kernel {args.kernel_command}"
+    if args.command == "compose" and getattr(args, "compose_command", None):
+        return f"compose {args.compose_command}"
     return str(args.command)
 
 
@@ -100,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_kernel(subparsers)
     _add_gdb(subparsers)
     _add_completion(subparsers)
+    _add_compose(subparsers)
     return parser
 
 
@@ -465,6 +469,27 @@ def _add_gdb(subparsers: argparse._SubParsersAction) -> None:
     )
 
 
+def _add_compose(subparsers: argparse._SubParsersAction) -> None:
+    p = subparsers.add_parser(
+        "compose",
+        help="manage multi-VM compose projects",
+        description="Validate and inspect a vmgen-compose.toml project.",
+    )
+    _add_common_directory(p)
+    compose_sub = p.add_subparsers(dest="compose_command", metavar="COMMAND")
+    validate = compose_sub.add_parser(
+        "validate",
+        help="validate a compose project and its service projects",
+    )
+    _add_common_directory(validate)
+    show = compose_sub.add_parser(
+        "show",
+        help="show the resolved compose topology",
+    )
+    _add_common_directory(show)
+    show.add_argument("--json", action="store_true", help="machine-readable output")
+
+
 def _add_completion(subparsers: argparse._SubParsersAction) -> None:
     p = subparsers.add_parser(
         "completion",
@@ -517,6 +542,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "kernel": kernel_dispatch,
         "gdb": runtime_gdb,
         "completion": print_completion,
+        "compose": compose_dispatch,
     }
 
     try:

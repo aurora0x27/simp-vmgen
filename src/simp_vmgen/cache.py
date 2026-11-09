@@ -37,7 +37,7 @@ def rootfs_sources_dir() -> Path:
 
 
 @contextmanager
-def _file_lock(path: Path) -> Iterator[TextIO]:
+def file_lock(path: Path) -> Iterator[TextIO]:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = path.open("a+")
     try:
@@ -191,7 +191,7 @@ def download(
     target.parent.mkdir(parents=True, exist_ok=True)
     lock_path = target.with_name(f"{target.name}.lock")
 
-    with _file_lock(lock_path):
+    with file_lock(lock_path):
         if target.exists() and checksum and verify_checksum(target, checksum):
             return target, checksum
         if target.exists() and not checksum and allow_unverified:

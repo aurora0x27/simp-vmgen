@@ -71,6 +71,7 @@ src/simp_vmgen/
 ├── users.py          user/SSH-key provisioning data
 ├── mounts.py         resolved 9p mounts
 ├── network.py        resolved experimental NICs and cloud-init network config
+├── compose.py        compose topology, endpoint registry and service state
 ├── sshkeys.py        key generation and askpass helper
 ├── net.py            free-port allocation
 ├── layout.py         `.simp-vmgen/` paths

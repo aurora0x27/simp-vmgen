@@ -168,7 +168,7 @@ def derive_mac(project: str, name: str) -> str:
     return ":".join(f"{octet:02x}" for octet in (0x02, *digest[:5]))
 
 
-def _network_name(value: str, where: str) -> str:
+def normalize_network_name(value: str, where: str) -> str:
     if _NETWORK_NAME_RE.match(value) is None:
         raise ConfigError(
             f"{where}: invalid network name {value!r} "
@@ -179,7 +179,7 @@ def _network_name(value: str, where: str) -> str:
     return value
 
 
-def _ipv4_interface(value: str, where: str) -> str:
+def normalize_ipv4_interface(value: str, where: str) -> str:
     if "/" not in value:
         raise ConfigError(f"{where}: expected an IPv4 CIDR such as 192.168.77.10/24")
     try:
@@ -191,7 +191,7 @@ def _ipv4_interface(value: str, where: str) -> str:
     return str(interface)
 
 
-def _ipv4_address(value: str, where: str) -> str:
+def normalize_ipv4_address(value: str, where: str) -> str:
     try:
         address = ipaddress.IPv4Address(value)
     except ValueError as exc:
@@ -201,7 +201,7 @@ def _ipv4_address(value: str, where: str) -> str:
     return str(address)
 
 
-def _mac_address(value: str, where: str) -> str:
+def normalize_mac(value: str, where: str) -> str:
     normalized = value.lower()
     if _MAC_RE.match(normalized) is None:
         raise ConfigError(f"{where}: invalid MAC address {value!r}")
@@ -210,7 +210,7 @@ def _mac_address(value: str, where: str) -> str:
     return normalized
 
 
-def _multicast_endpoint(value: str, where: str) -> str:
+def normalize_multicast_endpoint(value: str, where: str) -> str:
     host, separator, port = value.rpartition(":")
     if not separator:
         raise ConfigError(f"{where}: expected a multicast endpoint such as 239.192.77.1:4789")
@@ -679,17 +679,17 @@ class Config:
         seen_gateway = False
         for index, network in enumerate(self.networks):
             where = f"{source}.network[{index}]"
-            network.name = _network_name(network.name, f"{where}.name")
+            network.name = normalize_network_name(network.name, f"{where}.name")
             if network.name in seen_network_names:
                 raise ConfigError(f"{where}.name: duplicate network {network.name!r}")
             seen_network_names.add(network.name)
-            effective_mac = _mac_address(
+            effective_mac = normalize_mac(
                 network.mac or network.effective_mac(self.project.name), f"{where}.mac"
             )
             if effective_mac in seen_network_macs:
                 raise ConfigError(f"{where}.mac: duplicate MAC address {effective_mac!r}")
             seen_network_macs.add(effective_mac)
-            network.mcast = _multicast_endpoint(network.mcast, f"{where}.mcast")
+            network.mcast = normalize_multicast_endpoint(network.mcast, f"{where}.mcast")
             if network.mcast in seen_network_mcast:
                 raise ConfigError(f"{where}.mcast: duplicate multicast endpoint {network.mcast!r}")
             seen_network_mcast.add(network.mcast)
@@ -699,7 +699,7 @@ class Config:
             else:
                 if not network.address:
                     raise ConfigError(f"{where}.address: required when dhcp is false")
-                network.address = _ipv4_interface(network.address, f"{where}.address")
+                network.address = normalize_ipv4_interface(network.address, f"{where}.address")
                 host = ipaddress.IPv4Interface(network.address).ip
                 if str(host) in seen_network_addresses:
                     raise ConfigError(f"{where}.address: duplicate address {host}")
@@ -710,7 +710,7 @@ class Config:
                             f"{where}.gateway: only one experimental network may set a gateway"
                         )
                     seen_gateway = True
-                    network.gateway = _ipv4_address(network.gateway, f"{where}.gateway")
+                    network.gateway = normalize_ipv4_address(network.gateway, f"{where}.gateway")
                     if (
                         ipaddress.IPv4Address(network.gateway)
                         not in ipaddress.IPv4Interface(network.address).network

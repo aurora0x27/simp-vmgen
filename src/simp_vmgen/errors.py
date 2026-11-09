@@ -25,3 +25,7 @@ class CacheError(SimpVmgenError):
 
 class LockError(SimpVmgenError):
     """Invalid or unwritable vmgen.lock."""
+
+
+class ComposeError(SimpVmgenError):
+    """Invalid compose project, state or network allocation."""

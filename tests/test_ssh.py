@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -127,7 +128,7 @@ def test_wait_uses_serial_marker(tmp_path: Path) -> None:
     assert main(["new", str(root)]) == 0
     layout = ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(ssh_port=2222, gdb_port=None, pid=process.pid, started_at="now").save(
@@ -160,7 +161,7 @@ def test_guest_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert main(["new", str(root)]) == 0
     layout = ProjectLayout(root, Config.load(root / "vmgen.toml"))
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(ssh_port=2222, gdb_port=None, pid=process.pid, started_at="now").save(

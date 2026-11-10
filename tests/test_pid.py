@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,11 +13,9 @@ from simp_vmgen.config import Config
 
 
 def test_pid_matches_qemu_accepts_qemu_shaped_process(tmp_path: Path) -> None:
-    sleep = shutil.which("sleep")
-    assert sleep is not None
     qemu = tmp_path / "qemu-system-x86_64"
-    shutil.copy2(sleep, qemu)
-    process = subprocess.Popen([str(qemu), "30"])
+    shutil.copy2("/bin/cat", qemu)
+    process = subprocess.Popen([str(qemu)], stdin=subprocess.PIPE)
     try:
         cmdline = b""
         for _ in range(50):
@@ -35,7 +34,7 @@ def test_running_pid_ignores_unrelated_process(tmp_path: Path) -> None:
     assert main(["new", str(root)]) == 0
     layout = runtime.ProjectLayout(root, Config.load(root / "vmgen.toml"))
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         assert not runtime._pid_matches_qemu(process.pid)

@@ -4,6 +4,7 @@ import json
 import shutil
 import socket
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -113,7 +114,7 @@ def test_gdb_reports_connection(tmp_path: Path, capsys) -> None:
     assert main(["new", str(root), "--gdb"]) == 0
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(
@@ -136,7 +137,7 @@ def test_status_and_stop(tmp_path: Path) -> None:
     root = _project(tmp_path)
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(
@@ -173,7 +174,7 @@ def test_status_json_and_check(tmp_path: Path, capsys: pytest.CaptureFixture[str
 
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(
@@ -202,7 +203,7 @@ def test_wait_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     capsys.readouterr()
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         RunState(
@@ -250,7 +251,7 @@ def test_wait_reports_progress_and_serial_tail(
     capsys.readouterr()
     layout = runtime.ProjectLayout(root, runtime.load_project(str(root))[1])
     layout.ensure()
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         layout.pid_file.write_text(str(process.pid), encoding="utf-8")
         layout.serial_log.write_text("kernel panic\n", encoding="utf-8")

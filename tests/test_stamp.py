@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -212,7 +213,7 @@ def test_run_wait_json_combines_summary_and_readiness(
 ) -> None:
     root, _base = _cloud_project(tmp_path, monkeypatch)
     layout = runtime.ProjectLayout(root, Config.load(root / "vmgen.toml"))
-    process = subprocess.Popen(["sleep", "30"])
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
         monkeypatch.setattr(runtime, "_wait_for_pid", lambda *args, **kwargs: process.pid)
         monkeypatch.setattr(

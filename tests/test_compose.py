@@ -425,6 +425,7 @@ def test_fix_compose_ownership_uses_sudo_ids(
     (state.parent / "lock").write_text("", encoding="utf-8")
     calls: list[tuple[Path, int, int]] = []
     monkeypatch.setattr(compose.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(compose.os, "getuid", lambda: 0)
     monkeypatch.setenv("SUDO_UID", "1000")
     monkeypatch.setenv("SUDO_GID", "1001")
     monkeypatch.setattr(
@@ -446,6 +447,7 @@ def test_fix_compose_ownership_is_noop_without_sudo_ids(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(compose.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(compose.os, "getuid", lambda: 0)
     monkeypatch.delenv("SUDO_UID", raising=False)
     monkeypatch.delenv("SUDO_GID", raising=False)
     monkeypatch.setattr(compose.os, "chown", lambda *args: pytest.fail("unexpected chown"))

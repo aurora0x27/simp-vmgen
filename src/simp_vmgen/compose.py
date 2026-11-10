@@ -488,7 +488,12 @@ def _registry_lock() -> Iterator[None]:
 
 def fix_compose_ownership(root: Path) -> None:
     """Give sudo-created state files back to the invoking user."""
-    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+    if (
+        not hasattr(os, "geteuid")
+        or os.geteuid() != 0
+        or not hasattr(os, "getuid")
+        or os.getuid() != 0
+    ):
         return
     raw_uid = os.environ.get("SUDO_UID")
     raw_gid = os.environ.get("SUDO_GID")

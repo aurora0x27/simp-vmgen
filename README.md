@@ -29,7 +29,7 @@ full config reference, and [CHANGELOG.md](CHANGELOG.md) for release history.
 Install the latest release from GitHub:
 
 ```sh
-uv tool install "git+https://github.com/aurora0x27/simp-vmgen@v0.3.0"
+uv tool install "git+https://github.com/aurora0x27/simp-vmgen@v0.3.1"
 ```
 
 Alternatively, download the wheel or source archive from the
@@ -37,7 +37,7 @@ Alternatively, download the wheel or source archive from the
 it directly:
 
 ```sh
-uv tool install ./simp_vmgen-0.3.0-py3-none-any.whl
+uv tool install ./simp_vmgen-0.3.1-py3-none-any.whl
 ```
 
 For local development, use `uv run simp-vmgen --help` from a checkout (see

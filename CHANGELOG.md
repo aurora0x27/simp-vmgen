@@ -4,6 +4,19 @@ All notable changes to `simp-vmgen` are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-11-10
+
+### Fixed
+
+- `compose stop` also stops services recorded in state after they leave the
+  compose file, and clears their stale membership markers.
+- Bridge prepare/cleanup accept `CAP_NET_ADMIN` in addition to root.
+- The compose endpoint registry validates its schema before use.
+- Standalone compose protection no longer accepts an environment-variable
+  bypass; only an internal config override counts as compose-driven.
+- `compose` and `compose network` require a subcommand (usage exit 2), and
+  `compose up --json` emits a structured error object on failure.
+
 ## [0.3.0] - 2026-11-10
 
 ### Added

@@ -1,0 +1,27 @@
+schema = 1
+
+[image]
+url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.0-x86_64-bios-cloudinit-r0.qcow2"
+filename = "nocloud_alpine-3.22.0-x86_64-bios-cloudinit-r0.qcow2"
+checksum = ""
+checksum_url = "https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/cloud/nocloud_alpine-3.22.0-x86_64-bios-cloudinit-r0.qcow2.sha512"
+
+[kernel]
+source = ""
+version = ""
+url = ""
+checksum = ""
+repo = ""
+commit = ""
+artifact = ""
+artifact_checksum = ""
+
+[rootfs]
+source = ""
+version = ""
+kind = ""
+url = ""
+checksum = ""
+
+[tool]
+version = "0.3.0"

@@ -4,7 +4,7 @@ All notable changes to `simp-vmgen` are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-11-10
 
 ### Added
 
@@ -38,7 +38,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Socket multicast is the default rootless backend. Bridge networking needs a
   prepared host, `qemu-bridge-helper` and privileged network preparation.
-- Release/versioning for the compose work has not been decided yet.
+- Compose service addresses must use the compose network prefix.
 
 ## [0.2.0] - 2026-11-06
 

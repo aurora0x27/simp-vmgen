@@ -325,8 +325,8 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 
 The original single-VM plan and compose M0–M5 are implemented. Compose includes
 socket and bridge networking, lifecycle commands, privileged bridge management
-and the `examples/network-lab` topology. The compose work is unreleased; the
-latest release is 0.2.0. There is no tracked TODO file; agent scratch context
-lives in `.agent/` (gitignored). Treat this document, the README,
+and the `examples/network-lab` topology. The latest release is 0.3.0. There is
+no tracked TODO file; agent scratch context lives in `.agent/` (gitignored).
+Treat this document, the README,
 `docs/configuration.md`, `docs/compose.md`, and the tests as the maintained
 source of truth.

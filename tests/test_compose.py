@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 
 import pytest
 
+from simp_vmgen import compose
 from simp_vmgen.cli import EXIT_ERROR, EXIT_OK, build_parser, main
 from simp_vmgen.compose import (
     assert_standalone_allowed,
     clear_member,
+    compose_lock,
     ensure_state,
+    fix_compose_ownership,
     load_compose,
     materialize_service,
     state_path,
@@ -342,6 +346,35 @@ project = "./attacker"
         load_compose(root)
 
 
+def test_external_bridge_is_not_claimed_after_removing_bridge_key(
+    tmp_path: Path,
+) -> None:
+    _service(tmp_path / "attacker", "attacker")
+    root = _compose(tmp_path, BRIDGE)
+    first = ensure_state(load_compose(root))
+    assert first.bridges["lan"] == "br-test"
+    assert first.owned_bridges == []
+
+    (root / "vmgen-compose.toml").write_text(
+        BRIDGE.replace('bridge = "br-test"\n', ""),
+        encoding="utf-8",
+    )
+    second = ensure_state(load_compose(root))
+    assert second.bridges["lan"] != "br-test"
+    assert "br-test" not in second.owned_bridges
+    assert second.bridges["lan"] in second.owned_bridges
+
+
+def test_compose_rejects_address_prefix_mismatch(tmp_path: Path) -> None:
+    _service(tmp_path / "attacker", "attacker")
+    root = _compose(
+        tmp_path,
+        BASE.replace('address = "192.168.77.10/24"', 'address = "192.168.77.10/25"'),
+    )
+    with pytest.raises(ComposeError, match="prefix must match"):
+        load_compose(root)
+
+
 def test_compose_rejects_duplicate_bridge(tmp_path: Path) -> None:
     _service(tmp_path / "attacker", "attacker")
     root = _compose(
@@ -367,6 +400,56 @@ project = "./attacker"
     )
     with pytest.raises(ComposeError, match="duplicate bridge"):
         load_compose(root)
+
+
+def test_compose_lock_wraps_permission_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    @contextlib.contextmanager
+    def broken(path: Path):
+        raise PermissionError("denied")
+        yield
+
+    monkeypatch.setattr(compose, "file_lock", broken)
+    with pytest.raises(ComposeError, match="cannot lock compose state"), compose_lock(tmp_path):
+        pass
+
+
+def test_fix_compose_ownership_uses_sudo_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "lab"
+    state = source / ".simp-vmgen" / "compose" / "state.json"
+    state.parent.mkdir(parents=True)
+    state.write_text("{}", encoding="utf-8")
+    (state.parent / "lock").write_text("", encoding="utf-8")
+    calls: list[tuple[Path, int, int]] = []
+    monkeypatch.setattr(compose.os, "geteuid", lambda: 0)
+    monkeypatch.setenv("SUDO_UID", "1000")
+    monkeypatch.setenv("SUDO_GID", "1001")
+    monkeypatch.setattr(
+        compose.os,
+        "chown",
+        lambda path, uid, gid: calls.append((Path(path), uid, gid)),
+    )
+    fix_compose_ownership(source)
+    assert {path.name for path, _uid, _gid in calls} == {
+        "state.json",
+        "lock",
+        "compose",
+        ".simp-vmgen",
+    }
+    assert all(uid == 1000 and gid == 1001 for _path, uid, gid in calls)
+
+
+def test_fix_compose_ownership_is_noop_without_sudo_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(compose.os, "geteuid", lambda: 0)
+    monkeypatch.delenv("SUDO_UID", raising=False)
+    monkeypatch.delenv("SUDO_GID", raising=False)
+    monkeypatch.setattr(compose.os, "chown", lambda *args: pytest.fail("unexpected chown"))
+    fix_compose_ownership(tmp_path)
 
 
 def test_compose_member_blocks_standalone_run(
@@ -419,7 +502,7 @@ project = "./attacker"
         ),
         (
             BASE.replace('address = "192.168.77.20/24"', 'address = "192.168.77.10/24"'),
-            "share 192.168.77.10/24",
+            "share 192.168.77.10",
         ),
         (
             BASE.replace('address = "192.168.77.20/24"', 'address = "192.168.77.0/24"'),

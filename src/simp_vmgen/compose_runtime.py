@@ -110,6 +110,26 @@ def compose_build(args: Any) -> int:
     return 1 if failures else 0
 
 
+def _cleanup_started(
+    compose: ComposeConfig,
+    configs: dict[str, Config],
+    preexisting: set[str],
+) -> None:
+    with _compose_active():
+        for name, service in compose.services.items():
+            if name in preexisting:
+                continue
+            config = configs[name]
+            if _running(service.root, config):
+                with (
+                    contextlib.suppress(SimpVmgenError),
+                    contextlib.redirect_stdout(sys.stderr),
+                ):
+                    runtime.stop(_args(service.root, config))
+            with contextlib.suppress(SimpVmgenError):
+                clear_member(service.root)
+
+
 def compose_up(args: Any) -> int:
     root = resolve_compose_root(getattr(args, "directory", None))
     compose = load_compose(root)
@@ -118,16 +138,29 @@ def compose_up(args: Any) -> int:
     json_output = getattr(args, "json", False)
 
     with compose_lock(root):
+        previous = load_state(root)
+        previous_owned = set(previous.owned_bridges) if previous is not None else set()
         state = ensure_state_locked(compose)
-        missing_bridges = [
-            state.bridges[name]
-            for name, network in compose.networks.items()
-            if network.driver == "bridge" and not bridge_exists(state.bridges[name])
-        ]
+        missing_bridges: list[str] = []
+        unprepared_bridges: list[str] = []
+        for name, network in compose.networks.items():
+            if network.driver != "bridge":
+                continue
+            bridge = state.bridges[name]
+            if not bridge_exists(bridge):
+                missing_bridges.append(bridge)
+            elif not network.bridge and bridge not in previous_owned:
+                unprepared_bridges.append(bridge)
         if missing_bridges:
             raise ComposeError(
                 "missing bridge(s): "
                 + ", ".join(missing_bridges)
+                + "; run `sudo simp-vmgen compose network prepare` first"
+            )
+        if unprepared_bridges:
+            raise ComposeError(
+                "bridge(s) are not owned by this compose project: "
+                + ", ".join(unprepared_bridges)
                 + "; run `sudo simp-vmgen compose network prepare` first"
             )
         configs = {
@@ -143,46 +176,39 @@ def compose_up(args: Any) -> int:
             write_member(service.root, root, name)
 
         failures = 0
-        for name, service in compose.services.items():
-            print(f"==> up {name}", file=sys.stderr if json_output else sys.stdout)
-            try:
-                with _compose_active():
-                    output = (
-                        contextlib.redirect_stdout(sys.stderr)
-                        if json_output
-                        else contextlib.nullcontext()
-                    )
-                    with output:
-                        result = runtime.up(
-                            _args(
-                                service.root,
-                                configs[name],
-                                no_build=no_build,
-                                timeout=timeout,
-                                json=False,
-                            )
+        try:
+            for name, service in compose.services.items():
+                print(f"==> up {name}", file=sys.stderr if json_output else sys.stdout)
+                try:
+                    with _compose_active():
+                        output = (
+                            contextlib.redirect_stdout(sys.stderr)
+                            if json_output
+                            else contextlib.nullcontext()
                         )
-            except SimpVmgenError as exc:
-                _print_error(name, exc)
-                failures += 1
-                break
-            if result != 0:
-                failures += 1
-                break
+                        with output:
+                            result = runtime.up(
+                                _args(
+                                    service.root,
+                                    configs[name],
+                                    no_build=no_build,
+                                    timeout=timeout,
+                                    json=False,
+                                )
+                            )
+                except SimpVmgenError as exc:
+                    _print_error(name, exc)
+                    failures += 1
+                    break
+                if result != 0:
+                    failures += 1
+                    break
+        except KeyboardInterrupt:
+            _cleanup_started(compose, configs, preexisting)
+            raise
 
         if failures:
-            with _compose_active():
-                for name, service in compose.services.items():
-                    if name in preexisting:
-                        continue
-                    config = configs[name]
-                    if _running(service.root, config):
-                        with (
-                            contextlib.suppress(SimpVmgenError),
-                            contextlib.redirect_stdout(sys.stderr),
-                        ):
-                            runtime.stop(_args(service.root, config))
-                    clear_member(service.root)
+            _cleanup_started(compose, configs, preexisting)
             return 1
 
     data = {
@@ -358,7 +384,7 @@ def compose_stop(args: Any) -> int:
 
 
 def compose_down(args: Any) -> int:
-    root = resolve_compose_root(getattr(args, "directory", None))
+    root = resolve_compose_root(getattr(args, "directory", None), allow_state=True)
     json_output = getattr(args, "json", False)
     load_error: ComposeError | None = None
     try:

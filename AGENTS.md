@@ -149,9 +149,16 @@ lab/
   lock. `up` writes per-service membership markers; standalone `run` refuses to
   start a marked service.
 - `down` releases socket state and clears markers, but owned bridges remain
-  until `compose network cleanup`. External bridges are never deleted.
+  until `compose network cleanup`. External bridges are never deleted, and a
+  derived bridge name is only reused when the previous state recorded it as
+  owned.
+- `down` must recover from a missing/invalid compose file by using saved state
+  service roots.
+- Compose service addresses must use the compose network prefix; duplicate host
+  addresses are rejected regardless of the written prefix.
 - Bridge preparation is explicit and privileged; the CLI never invokes `sudo`
-  automatically.
+  automatically. Privileged network commands must not allocate socket endpoints
+  and must restore state/lock ownership to `SUDO_UID`/`SUDO_GID`.
 - The single-VM runtime accepts an internal `config_override` used by compose.
   It must remain equivalent to loading the same effective config from disk.
 

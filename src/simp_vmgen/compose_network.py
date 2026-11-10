@@ -15,12 +15,13 @@ from .compose import (
     ComposeConfig,
     ComposeError,
     compose_lock,
+    delete_state,
     ensure_state_locked,
+    fix_compose_ownership,
     load_compose,
     load_state,
     resolve_compose_root,
     save_state,
-    state_path,
 )
 from .config import CONFIG_FILENAME, Config
 from .errors import SimpVmgenError
@@ -31,6 +32,24 @@ _COMMON_HELPERS = (
     "/usr/lib/qemu/qemu-bridge-helper",
     "/usr/local/libexec/qemu-bridge-helper",
 )
+BRIDGE_CONF = Path("/etc/qemu/bridge.conf")
+
+
+def bridge_allowlist() -> list[str]:
+    try:
+        lines = BRIDGE_CONF.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    allowed: list[str] = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == "allow":
+            allowed.append(parts[1])
+    return allowed
+
+
+def _bridge_allowed(name: str, allowlist: list[str]) -> bool:
+    return "*" in allowlist or name in allowlist
 
 
 def bridge_helper() -> str | None:
@@ -122,84 +141,103 @@ def compose_network_prepare(args: Any) -> int:
         print("no bridge networks in this compose project")
         return 0
     _require_privilege("prepare")
-    with compose_lock(root):
-        previous = load_state(root)
-        previous_owned = set(previous.owned_bridges) if previous is not None else set()
-        state = ensure_state_locked(compose)
-        created: list[str] = []
-        try:
-            for name, network in compose.networks.items():
-                if network.driver != "bridge":
-                    continue
-                bridge = state.bridges[name]
-                exists = bridge_exists(bridge)
-                if exists:
-                    _require_bridge_type(bridge)
-                    if not network.bridge and bridge not in previous_owned:
-                        raise ComposeError(
-                            f"bridge {bridge!r} already exists but is not owned by this "
-                            "compose project; set bridge = ... to use it explicitly"
-                        )
-                    continue
-                if network.bridge:
-                    raise ComposeError(f"external bridge {bridge!r} does not exist")
-                _run_ip(
-                    ["ip", "link", "add", "name", bridge, "type", "bridge"],
-                    f"cannot create bridge {bridge!r}",
-                )
-                created.append(bridge)
-                _run_ip(
-                    ["ip", "link", "set", "dev", bridge, "up"],
-                    f"cannot bring bridge {bridge!r} up",
-                )
-            save_state(root, state)
-        except Exception:
-            for bridge in reversed(created):
-                with contextlib.suppress(ComposeError):
-                    _run_ip(["ip", "link", "delete", "dev", bridge], "rollback")
-            if previous is None:
-                state_path(root).unlink(missing_ok=True)
-            else:
-                save_state(root, previous)
-            raise
+    try:
+        with compose_lock(root):
+            previous = load_state(root)
+            previous_owned = set(previous.owned_bridges) if previous is not None else set()
+            state = ensure_state_locked(compose, allocate_socket=False)
+            created: list[str] = []
+            try:
+                for name, network in compose.networks.items():
+                    if network.driver != "bridge":
+                        continue
+                    bridge = state.bridges[name]
+                    exists = bridge_exists(bridge)
+                    if exists:
+                        _require_bridge_type(bridge)
+                        if not network.bridge and bridge not in previous_owned:
+                            raise ComposeError(
+                                f"bridge {bridge!r} already exists but is not owned by this "
+                                "compose project; set bridge = ... to use it explicitly"
+                            )
+                        continue
+                    if network.bridge:
+                        raise ComposeError(f"external bridge {bridge!r} does not exist")
+                    _run_ip(
+                        ["ip", "link", "add", "name", bridge, "type", "bridge"],
+                        f"cannot create bridge {bridge!r}",
+                    )
+                    created.append(bridge)
+                    _run_ip(
+                        ["ip", "link", "set", "dev", bridge, "up"],
+                        f"cannot bring bridge {bridge!r} up",
+                    )
+                save_state(root, state)
+            except Exception:
+                for bridge in reversed(created):
+                    with contextlib.suppress(ComposeError):
+                        _run_ip(["ip", "link", "delete", "dev", bridge], "rollback")
+                if previous is None:
+                    delete_state(root)
+                else:
+                    save_state(root, previous)
+                raise
+    finally:
+        fix_compose_ownership(root)
     print(f"prepared {len(_bridge_networks(compose))} bridge network(s) for {compose.project.name}")
     return 0
 
 
 def compose_network_cleanup(args: Any) -> int:
-    root = resolve_compose_root(getattr(args, "directory", None))
+    root = resolve_compose_root(getattr(args, "directory", None), allow_state=True)
+    state = load_state(root)
+    if state is None:
+        print("no compose network state")
+        return 0
+    if not state.owned_bridges:
+        print("no owned bridges to remove")
+        return 0
     _require_privilege("cleanup")
-    with compose_lock(root):
-        state = load_state(root)
-        if state is None:
-            print("no compose network state")
-            return 0
-        running = _running_services(state)
-        if running:
-            raise ComposeError(
-                "services are still running: "
-                + ", ".join(sorted(running))
-                + "; run `simp-vmgen compose down` first"
-            )
-        removed: set[str] = set()
-        for bridge in list(state.owned_bridges):
-            if bridge_exists(bridge):
-                _run_ip(["ip", "link", "delete", "dev", bridge], f"cannot delete bridge {bridge!r}")
-            removed.add(bridge)
-        state.owned_bridges = [bridge for bridge in state.owned_bridges if bridge not in removed]
-        state.bridges = {
-            name: bridge for name, bridge in state.bridges.items() if bridge not in removed
-        }
-        if state.owned_bridges or state.networks or state.services:
-            save_state(root, state)
-        else:
-            state_path(root).unlink(missing_ok=True)
+    try:
+        with compose_lock(root):
+            state = load_state(root)
+            if state is None:
+                print("no compose network state")
+                return 0
+            running = _running_services(state)
+            if running:
+                raise ComposeError(
+                    "services are still running: "
+                    + ", ".join(sorted(running))
+                    + "; run `simp-vmgen compose down` first"
+                )
+            removed: set[str] = set()
+            for bridge in list(state.owned_bridges):
+                if bridge_exists(bridge):
+                    _require_bridge_type(bridge)
+                    _run_ip(
+                        ["ip", "link", "delete", "dev", bridge],
+                        f"cannot delete bridge {bridge!r}",
+                    )
+                removed.add(bridge)
+            state.owned_bridges = [
+                bridge for bridge in state.owned_bridges if bridge not in removed
+            ]
+            state.bridges = {
+                name: bridge for name, bridge in state.bridges.items() if bridge not in removed
+            }
+            if state.owned_bridges or state.networks or state.services:
+                save_state(root, state)
+            else:
+                delete_state(root)
+    finally:
+        fix_compose_ownership(root)
     print(f"removed {len(removed)} owned bridge(s)")
     return 0
 
 
 def compose_network_status(args: Any) -> int:
-    root = resolve_compose_root(getattr(args, "directory", None))
+    root = resolve_compose_root(getattr(args, "directory", None), allow_state=True)
     load_error: ComposeError | None = None
     try:
         compose: ComposeConfig | None = load_compose(root)
@@ -216,10 +254,13 @@ def compose_network_status(args: Any) -> int:
         "ip": shutil.which("ip") is not None,
         "tun": Path("/dev/net/tun").exists(),
         "bridge_helper": bridge_helper(),
+        "bridge_conf": str(BRIDGE_CONF),
+        "allowlist": bridge_allowlist(),
         "networks": {},
         "owned_bridges": [],
     }
     owned = set(state.owned_bridges) if state is not None else set()
+    allowlist = data["allowlist"]
     if compose is not None:
         for name, network in compose.networks.items():
             if network.driver != "bridge":
@@ -230,6 +271,7 @@ def compose_network_status(args: Any) -> int:
                 "owned": bridge in owned if bridge else False,
                 "exists": bridge_exists(bridge) if bridge else False,
                 "external": bool(network.bridge),
+                "allowed": _bridge_allowed(bridge, allowlist) if bridge else False,
             }
     data["owned_bridges"] = [
         {"name": bridge, "exists": bridge_exists(bridge)} for bridge in sorted(owned)
@@ -242,10 +284,12 @@ def compose_network_status(args: Any) -> int:
     print(f"ip      : {'yes' if data['ip'] else 'no'}")
     print(f"tun     : {'yes' if data['tun'] else 'no'}")
     print(f"helper  : {data['bridge_helper'] or '(not found)'}")
+    print(f"allow   : {data['bridge_conf']} {data['allowlist']}")
     for name, item in data["networks"].items():
         print(
             f"network {name}: bridge={item['bridge']} exists={item['exists']} "
-            f"owned={item['owned']} external={item['external']}"
+            f"owned={item['owned']} external={item['external']} "
+            f"allowed={item['allowed']}"
         )
     for item in data["owned_bridges"]:
         print(f"owned   {item['name']}: exists={item['exists']}")

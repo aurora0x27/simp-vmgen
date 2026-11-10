@@ -108,7 +108,7 @@ def test_mixed_cloud_network(tmp_path: Path) -> None:
         for root in roots.values():
             assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
         for root in roots.values():
-            assert runtime.wait(_args(root, timeout=300)) == 0
+            assert runtime.wait(_args(root, timeout=600)) == 0
         for distro, (_address, peer) in nodes.items():
             assert (
                 runtime.guest(

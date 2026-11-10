@@ -99,13 +99,15 @@ class _EndpointRegistry:
     endpoints: dict[str, str] = field(default_factory=dict)
 
 
-def resolve_compose_root(directory: str | None = None) -> Path:
+def resolve_compose_root(directory: str | None = None, *, allow_state: bool = False) -> Path:
     current = Path(directory).expanduser() if directory else Path.cwd()
     if current.is_file():
         current = current.parent
     current = current.resolve()
     for candidate in (current, *current.parents):
         if (candidate / COMPOSE_FILENAME).is_file():
+            return candidate
+        if allow_state and (candidate / COMPOSE_DIR / STATE_FILENAME).is_file():
             return candidate
     raise ComposeError(f"no {COMPOSE_FILENAME} found in {current} or any parent directory")
 
@@ -230,6 +232,11 @@ def _from_dict(data: dict[str, Any], *, source: str, root: Path) -> ComposeConfi
             interface = ipaddress.IPv4Interface(address)
             if interface.ip not in network:
                 raise ComposeError(f"{binding_where}.address: {interface.ip} is outside {network}")
+            if interface.network != network:
+                raise ComposeError(
+                    f"{binding_where}.address: prefix must match {network} "
+                    "(for example 192.168.77.10/24)"
+                )
             if interface.ip in (network.network_address, network.broadcast_address):
                 raise ComposeError(
                     f"{binding_where}.address: cannot use the network or broadcast address"
@@ -318,11 +325,12 @@ def _validate(compose: ComposeConfig, *, source: str) -> None:
                     )
                 seen_ports[port] = service.name
         for binding in service.networks.values():
-            key = (binding.network, binding.address)
+            host = str(ipaddress.IPv4Interface(binding.address).ip)
+            key = (binding.network, host)
             if key in seen_addresses:
                 raise ComposeError(
                     f"{source}.services: {service.name!r} and "
-                    f"{seen_addresses[key]!r} share {binding.address} on {binding.network!r}"
+                    f"{seen_addresses[key]!r} share {host} on {binding.network!r}"
                 )
             seen_addresses[key] = service.name
             if binding.mac in seen_macs:
@@ -457,8 +465,52 @@ def save_state(root: Path, state: ComposeState) -> None:
 
 @contextmanager
 def compose_lock(root: Path) -> Iterator[None]:
-    with file_lock(root.resolve() / COMPOSE_DIR / LOCK_FILENAME):
-        yield
+    directory = root.resolve() / COMPOSE_DIR
+    try:
+        with file_lock(directory / LOCK_FILENAME):
+            yield
+    except OSError as exc:
+        raise ComposeError(
+            f"cannot lock compose state in {directory}: {exc}; "
+            "check directory ownership/permissions (a privileged prepare may have "
+            "created it as root)"
+        ) from exc
+
+
+@contextmanager
+def _registry_lock() -> Iterator[None]:
+    try:
+        with file_lock(_registry_lock_path()):
+            yield
+    except OSError as exc:
+        raise ComposeError(f"cannot lock compose endpoint registry: {exc}") from exc
+
+
+def fix_compose_ownership(root: Path) -> None:
+    """Give sudo-created state files back to the invoking user."""
+    if not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return
+    raw_uid = os.environ.get("SUDO_UID")
+    raw_gid = os.environ.get("SUDO_GID")
+    if not raw_uid or not raw_gid:
+        return
+    try:
+        uid, gid = int(raw_uid), int(raw_gid)
+    except ValueError:
+        return
+    paths = (
+        root.resolve() / ".simp-vmgen",
+        root.resolve() / COMPOSE_DIR,
+        root.resolve() / COMPOSE_DIR / LOCK_FILENAME,
+        state_path(root),
+    )
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            os.chown(path, uid, gid)
+        except OSError as exc:
+            raise ComposeError(f"cannot restore ownership of {path}: {exc}") from exc
 
 
 def ensure_state(compose: ComposeConfig) -> ComposeState:
@@ -466,39 +518,48 @@ def ensure_state(compose: ComposeConfig) -> ComposeState:
         return ensure_state_locked(compose)
 
 
-def ensure_state_locked(compose: ComposeConfig) -> ComposeState:
+def ensure_state_locked(compose: ComposeConfig, *, allocate_socket: bool = True) -> ComposeState:
     root = compose.root.resolve()
     state = load_state(root) or ComposeState()
     state.project = compose.project.name
     state.root = str(root)
-    with file_lock(_registry_lock_path()):
-        registry = _load_registry()
-        _prune_registry(registry)
-        endpoints: dict[str, str] = {}
-        bridges: dict[str, str] = {}
-        owned_bridges = set(state.owned_bridges)
-        for name, network in compose.networks.items():
-            if network.driver == "bridge":
-                bridge = network.bridge or state.bridges.get(name) or derive_bridge_name(root, name)
-                bridges[name] = bridge
-                if network.bridge:
-                    owned_bridges.discard(bridge)
+    endpoints: dict[str, str] = dict(state.networks)
+    bridges: dict[str, str] = {}
+    owned_bridges = set(state.owned_bridges)
+    if allocate_socket:
+        with _registry_lock():
+            registry = _load_registry()
+            _prune_registry(registry)
+            endpoints = {}
+            for name, network in compose.networks.items():
+                if network.driver == "bridge":
+                    continue
+                if network.mcast:
+                    endpoint = network.mcast
+                    _claim(registry, endpoint, root)
+                elif name in state.networks:
+                    endpoint = state.networks[name]
+                    _claim(registry, endpoint, root)
                 else:
-                    owned_bridges.add(bridge)
-                continue
-            if network.mcast:
-                endpoint = network.mcast
-                _claim(registry, endpoint, root)
-            elif name in state.networks:
-                endpoint = state.networks[name]
-                _claim(registry, endpoint, root)
-            else:
-                endpoint = _allocate(registry, root, name)
-            endpoints[name] = endpoint
-        for endpoint in state.networks.values():
-            if endpoint not in endpoints.values():
-                _release(registry, root, endpoint)
-        _save_registry(registry)
+                    endpoint = _allocate(registry, root, name)
+                endpoints[name] = endpoint
+            for endpoint in state.networks.values():
+                if endpoint not in endpoints.values():
+                    _release(registry, root, endpoint)
+            _save_registry(registry)
+    for name, network in compose.networks.items():
+        if network.driver != "bridge":
+            continue
+        previous_bridge = state.bridges.get(name)
+        if network.bridge:
+            bridge = network.bridge
+            owned_bridges.discard(bridge)
+        elif previous_bridge and previous_bridge in owned_bridges:
+            bridge = previous_bridge
+        else:
+            bridge = derive_bridge_name(root, name)
+            owned_bridges.add(bridge)
+        bridges[name] = bridge
     state.networks = endpoints
     state.bridges = bridges
     state.owned_bridges = sorted(owned_bridges)
@@ -518,7 +579,7 @@ def release_state_locked(root: Path) -> None:
     state = load_state(root)
     if state is None:
         return
-    with file_lock(_registry_lock_path()):
+    with _registry_lock():
         registry = _load_registry()
         _prune_registry(registry)
         for endpoint in state.networks.values():
@@ -530,7 +591,14 @@ def release_state_locked(root: Path) -> None:
     if state.owned_bridges:
         save_state(root, state)
     else:
+        delete_state(root)
+
+
+def delete_state(root: Path) -> None:
+    try:
         state_path(root).unlink(missing_ok=True)
+    except OSError as exc:
+        raise ComposeError(f"cannot remove compose state {state_path(root)}: {exc}") from exc
 
 
 def derive_bridge_name(root: Path, network_name: str) -> str:
@@ -648,16 +716,26 @@ def read_member(root: Path) -> dict[str, object] | None:
 
 def write_member(root: Path, compose_root: Path, service: str) -> None:
     path = member_marker(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"compose_root": str(compose_root.resolve()), "service": service}, indent=2)
-        + "\n",
-        encoding="utf-8",
-    )
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {"compose_root": str(compose_root.resolve()), "service": service},
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise ComposeError(f"cannot write compose membership marker {path}: {exc}") from exc
 
 
 def clear_member(root: Path) -> None:
-    member_marker(root).unlink(missing_ok=True)
+    path = member_marker(root)
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        raise ComposeError(f"cannot remove compose membership marker {path}: {exc}") from exc
 
 
 def assert_standalone_allowed(root: Path) -> None:

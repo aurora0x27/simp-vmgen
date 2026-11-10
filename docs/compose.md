@@ -110,11 +110,19 @@ nearest directory containing `vmgen-compose.toml` is used.
 - If `up` fails partway through, services started by that invocation are stopped
   and their membership markers are cleared. Services that were already running
   before the invocation are left alone.
+- If `up` is interrupted with Ctrl-C, services started by that invocation are
+  stopped and their markers are cleared; previously running services are left
+  alone.
 - If `down` cannot stop a service, it keeps the state file, registry entries and
   membership markers so the next `down` or `stop` can retry.
+- `down` can use the saved state when `vmgen-compose.toml` has been removed or
+  is temporarily invalid, as long as the state file still records service roots.
 - Bridge ownership is persisted in the compose state. `down` keeps state when
   owned bridges remain so `network cleanup` can find them; cleanup removes the
   state after the last owned bridge is gone.
+- Privileged `network prepare/cleanup` restores state/lock ownership to
+  `SUDO_UID`/`SUDO_GID` so later unprivileged compose commands keep working.
+  It does not allocate socket endpoints or write a root-owned endpoint registry.
 - A service whose process disappeared is reported as stopped; `up` starts it
   again and repeated `up`/`down` calls are idempotent.
 - `up` starts services sequentially and does not wait for application-level
@@ -148,7 +156,9 @@ bridge backends, and bridge preparation.
 - Fixed SSH/GDB ports must be unique across services; `"auto"` remains the
   recommended setting.
 - Service networks use static IPv4 addresses. Addresses must be inside the
-  compose network subnet and cannot be the network or broadcast address.
+  compose network subnet, must use the same prefix length as the subnet, and
+  cannot be the network or broadcast address. Host addresses must be unique
+  even if written with different prefixes.
 
 ## Networks and endpoints
 
@@ -164,7 +174,11 @@ bridge backends, and bridge preparation.
 - `network prepare` refuses to claim a pre-existing bridge that it did not
   record as owned; set `bridge = "name"` to use such a bridge explicitly.
 - QEMU needs `qemu-bridge-helper`, `/dev/net/tun` and the helper allowlist
-  configured on the host. Run `compose network status` to inspect readiness.
+  configured on the host. Run `compose network status` to inspect readiness;
+  it reports `/etc/qemu/bridge.conf` entries and whether each bridge is allowed.
+- Removing `bridge = "..."` from a network that previously used an external
+  bridge makes compose derive a new owned bridge. The external bridge is never
+  claimed or deleted.
 - Endpoint ownership is tracked in a small registry under the user cache
   directory, guarded by a file lock. A project reuses its persisted endpoint;
   different projects are kept on different endpoints. Registry entries whose

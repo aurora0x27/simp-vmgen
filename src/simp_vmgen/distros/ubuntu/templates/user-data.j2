@@ -37,7 +37,7 @@ chpasswd:
 
 ssh_pwauth: {{ "true" if ssh_pwauth else "false" }}
 disable_root: false
-package_update: true
+package_update: {{ "true" if packages else "false" }}
 package_upgrade: false
 packages:
 {% for package in packages %}

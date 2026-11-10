@@ -20,6 +20,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `[[network]]` now requires exactly one of `mcast` or `bridge`.
 - Compose-managed services are marked and refuse standalone `run`.
+- Ubuntu cloud-init only runs `package_update` when packages are requested.
+
+### Fixed
+
+- Privileged `compose network prepare/cleanup` no longer leaves root-owned
+  state/lock files or allocates socket endpoints in the root cache.
+- Removing an external `bridge` setting no longer makes cleanup delete that
+  external bridge.
+- Compose validates service address prefixes and duplicate host addresses.
+- `compose up` cleans up markers and started services on Ctrl-C.
+- `compose down` can recover from a missing or invalid compose file using saved
+  state.
+- `compose network status` reports QEMU bridge allowlist entries.
 
 ### Notes
 

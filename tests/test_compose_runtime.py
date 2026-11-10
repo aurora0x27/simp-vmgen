@@ -17,7 +17,7 @@ from simp_vmgen.compose import (
     write_member,
 )
 from simp_vmgen.config import Config
-from simp_vmgen.errors import ProjectError
+from simp_vmgen.errors import ComposeError, ProjectError
 
 TEXT = """schema = 1
 
@@ -109,6 +109,57 @@ def test_compose_up_writes_members_and_reports_json(
     assert member_marker(root / "a").is_file()
     assert member_marker(root / "b").is_file()
     assert all(call.no_build is False for call in calls)
+
+
+def test_compose_up_requires_owned_bridge(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _bridge_compose(tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(compose_runtime, "bridge_exists", lambda name: True)
+    monkeypatch.setattr(
+        compose_runtime.runtime,
+        "up",
+        lambda args: calls.append(Path(args.directory).name) or 0,
+    )
+    with pytest.raises(ComposeError, match="not owned"):
+        compose_runtime.compose_up(
+            SimpleNamespace(directory=str(root), no_build=True, timeout=None, json=False)
+        )
+    assert calls == []
+
+
+def test_compose_up_keyboard_interrupt_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _compose(tmp_path)
+    running = {"a": False}
+    stopped: list[str] = []
+
+    def fake_running(service_root: Path, config: Config) -> bool:
+        return running.get(service_root.name, False)
+
+    def fake_up(args: SimpleNamespace) -> int:
+        if Path(args.directory).name == "b":
+            raise KeyboardInterrupt
+        running["a"] = True
+        return 0
+
+    def fake_stop(args: SimpleNamespace) -> int:
+        stopped.append(Path(args.directory).name)
+        return 0
+
+    monkeypatch.setattr(compose_runtime, "_running", fake_running)
+    monkeypatch.setattr(compose_runtime.runtime, "up", fake_up)
+    monkeypatch.setattr(compose_runtime.runtime, "stop", fake_stop)
+    monkeypatch.setattr(compose_runtime.runtime, "status_data", lambda root, config: _status(root))
+
+    with pytest.raises(KeyboardInterrupt):
+        compose_runtime.compose_up(
+            SimpleNamespace(directory=str(root), no_build=True, timeout=None, json=False)
+        )
+    assert stopped == ["a"]
+    assert not member_marker(root / "a").exists()
+    assert not member_marker(root / "b").exists()
+    assert state_path(root).is_file()
 
 
 def test_compose_up_failure_stops_started_services_and_clears_markers(
@@ -371,6 +422,26 @@ def test_compose_down_json(
         "state": "down",
         "owned_bridges": [],
     }
+
+
+def test_compose_down_uses_state_when_compose_file_is_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _compose(tmp_path)
+    ensure_state(load_compose(root))
+    write_member(root / "a", root, "a")
+    (root / "vmgen-compose.toml").unlink()
+
+    stopped: list[str] = []
+    monkeypatch.setattr(
+        compose_runtime.runtime,
+        "stop",
+        lambda args: stopped.append(Path(args.directory).name) or 0,
+    )
+    assert compose_runtime.compose_down(SimpleNamespace(directory=str(root), json=False)) == 0
+    assert stopped == ["a", "b"]
+    assert not state_path(root).exists()
+    assert not member_marker(root / "a").exists()
 
 
 def test_compose_down_uses_state_when_config_is_broken(

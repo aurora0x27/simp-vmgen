@@ -197,6 +197,23 @@ def test_resolve_ssh_keys_missing_file(tmp_path: Path) -> None:
         resolve_ssh_keys([str(tmp_path / "missing.pub")], tmp_path)
 
 
+def test_ubuntu_skips_package_update_without_packages(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    config.provision.package_sets = []
+    config.provision.extra_packages = []
+    config.validate()
+    artifacts = render_cloud_init(
+        config,
+        load_distro("ubuntu"),
+        tmp_path,
+        tmp_path / "run",
+        make_iso=False,
+    )
+    data = yaml.safe_load(artifacts.user_data.read_text())
+    assert data["package_update"] is False
+    assert not data["packages"]
+
+
 def test_network_config_changes_instance_id(tmp_path: Path) -> None:
     config = _config(tmp_path)
     distro = load_distro("ubuntu")

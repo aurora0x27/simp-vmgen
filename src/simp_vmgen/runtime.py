@@ -305,7 +305,8 @@ def _print_run_summary(
 
 def run(args: Any) -> int:
     root, config = _load_args(args)
-    assert_standalone_allowed(root)
+    if getattr(args, "config_override", None) is None:
+        assert_standalone_allowed(root)
     distro, release = _load_distro(config)
     layout = ProjectLayout(root, config)
     layout.ensure()

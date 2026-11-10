@@ -464,7 +464,9 @@ def test_compose_member_blocks_standalone_run(
     assert "managed by compose" in capsys.readouterr().err
 
     monkeypatch.setenv("SIMP_VMGEN_COMPOSE_ACTIVE", "1")
-    assert assert_standalone_allowed(service) is None
+    assert main(["-C", str(service), "run", "-n"]) == EXIT_ERROR
+    assert "managed by compose" in capsys.readouterr().err
+
     clear_member(service)
     assert assert_standalone_allowed(service) is None
 

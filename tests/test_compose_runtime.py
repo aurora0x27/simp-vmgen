@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from simp_vmgen import compose_runtime
+from simp_vmgen import compose_runtime, runtime
 from simp_vmgen.cli import EXIT_ERROR, EXIT_OK, EXIT_USAGE, main
 from simp_vmgen.compose import (
     ensure_state,
@@ -374,6 +374,27 @@ def _bridge_compose(tmp_path: Path) -> Path:
         Config.default(name).save(service / "vmgen.toml")
     (tmp_path / "vmgen-compose.toml").write_text(BRIDGE_TEXT, encoding="utf-8")
     return tmp_path
+
+
+def test_config_override_bypasses_compose_marker(tmp_path: Path) -> None:
+    root = _compose(tmp_path)
+    service = root / "a"
+    (service / "work").mkdir()
+    write_member(service, root, "a")
+    config = Config.load(service / "vmgen.toml")
+    assert (
+        runtime.run(
+            SimpleNamespace(
+                directory=str(service),
+                config_override=config,
+                dry_run=True,
+                foreground=False,
+                snapshot=False,
+                json=False,
+            )
+        )
+        == 0
+    )
 
 
 def test_compose_up_requires_prepared_bridge(

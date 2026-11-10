@@ -575,11 +575,6 @@ def ensure_state_locked(compose: ComposeConfig, *, allocate_socket: bool = True)
     return state
 
 
-def release_state(root: Path) -> None:
-    with compose_lock(root):
-        release_state_locked(root)
-
-
 def release_state_locked(root: Path) -> None:
     root = root.resolve()
     state = load_state(root)
@@ -707,19 +702,6 @@ def member_marker(root: Path) -> Path:
     return root.resolve() / MEMBER_FILENAME
 
 
-def read_member(root: Path) -> dict[str, object] | None:
-    path = member_marker(root)
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return None
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ComposeError(f"cannot read compose membership marker {path}: {exc}") from exc
-    if not isinstance(data, dict):
-        raise ComposeError(f"invalid compose membership marker {path}")
-    return data
-
-
 def write_member(root: Path, compose_root: Path, service: str) -> None:
     path = member_marker(root)
     try:
@@ -745,8 +727,6 @@ def clear_member(root: Path) -> None:
 
 
 def assert_standalone_allowed(root: Path) -> None:
-    if os.environ.get("SIMP_VMGEN_COMPOSE_ACTIVE") == "1":
-        return
     marker = member_marker(root)
     if marker.is_file():
         raise ComposeError(

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -62,19 +61,6 @@ def _running(service_root: Path, config: Config) -> bool:
     return runtime.running_pid(ProjectLayout(service_root, config)) is not None
 
 
-@contextlib.contextmanager
-def _compose_active() -> Any:
-    previous = os.environ.get("SIMP_VMGEN_COMPOSE_ACTIVE")
-    os.environ["SIMP_VMGEN_COMPOSE_ACTIVE"] = "1"
-    try:
-        yield
-    finally:
-        if previous is None:
-            os.environ.pop("SIMP_VMGEN_COMPOSE_ACTIVE", None)
-        else:
-            os.environ["SIMP_VMGEN_COMPOSE_ACTIVE"] = previous
-
-
 def _print_error(name: str, exc: Exception) -> None:
     print(f"{name}: {exc}", file=sys.stderr)
 
@@ -115,19 +101,18 @@ def _cleanup_started(
     configs: dict[str, Config],
     preexisting: set[str],
 ) -> None:
-    with _compose_active():
-        for name, service in compose.services.items():
-            if name in preexisting:
-                continue
-            config = configs[name]
-            if _running(service.root, config):
-                with (
-                    contextlib.suppress(SimpVmgenError),
-                    contextlib.redirect_stdout(sys.stderr),
-                ):
-                    runtime.stop(_args(service.root, config))
-            with contextlib.suppress(SimpVmgenError):
-                clear_member(service.root)
+    for name, service in compose.services.items():
+        if name in preexisting:
+            continue
+        config = configs[name]
+        if _running(service.root, config):
+            with (
+                contextlib.suppress(SimpVmgenError),
+                contextlib.redirect_stdout(sys.stderr),
+            ):
+                runtime.stop(_args(service.root, config))
+        with contextlib.suppress(SimpVmgenError):
+            clear_member(service.root)
 
 
 def compose_up(args: Any) -> int:
@@ -180,22 +165,21 @@ def compose_up(args: Any) -> int:
             for name, service in compose.services.items():
                 print(f"==> up {name}", file=sys.stderr if json_output else sys.stdout)
                 try:
-                    with _compose_active():
-                        output = (
-                            contextlib.redirect_stdout(sys.stderr)
-                            if json_output
-                            else contextlib.nullcontext()
-                        )
-                        with output:
-                            result = runtime.up(
-                                _args(
-                                    service.root,
-                                    configs[name],
-                                    no_build=no_build,
-                                    timeout=timeout,
-                                    json=False,
-                                )
+                    output = (
+                        contextlib.redirect_stdout(sys.stderr)
+                        if json_output
+                        else contextlib.nullcontext()
+                    )
+                    with output:
+                        result = runtime.up(
+                            _args(
+                                service.root,
+                                configs[name],
+                                no_build=no_build,
+                                timeout=timeout,
+                                json=False,
                             )
+                        )
                 except SimpVmgenError as exc:
                     _print_error(name, exc)
                     failures += 1

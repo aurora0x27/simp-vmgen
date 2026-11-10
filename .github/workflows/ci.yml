@@ -57,9 +57,10 @@ jobs:
         if: failure()
         run: |
           if [ -f pytest.log ]; then
-            tail -80 pytest.log | while IFS= read -r line; do
-              echo "::error title=pytest::$line"
-            done
+            sed -n '/^=* FAILURES =*/,/^=* short test summary/p' pytest.log | head -120 |
+              while IFS= read -r line; do
+                echo "::error title=pytest::$line"
+              done
           fi
 
       - name: Build distributions

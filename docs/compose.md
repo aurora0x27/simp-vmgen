@@ -95,6 +95,9 @@ simp-vmgen compose network status [--json]
   `/dev/net/tun` and the QEMU bridge helper.
 
 `up`, `status`, `wait`, `stop` and `down` support `--json` where shown above.
+`up --json` emits a JSON error object on failure, including `state: "error"`,
+an `error` message and per-service status. Missing compose/network
+subcommands are usage errors and exit 2; operational failures exit 1.
 `--dry-run` is intentionally rejected for compose commands; the lifecycle
 mutates multiple services and does not have a meaningful single-preview mode.
 

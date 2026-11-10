@@ -476,7 +476,7 @@ def _add_compose(subparsers: argparse._SubParsersAction) -> None:
         description="Build, run and inspect a vmgen-compose.toml project.",
     )
     _add_common_directory(p)
-    compose_sub = p.add_subparsers(dest="compose_command", metavar="COMMAND")
+    compose_sub = p.add_subparsers(dest="compose_command", metavar="COMMAND", required=True)
 
     validate = compose_sub.add_parser(
         "validate",
@@ -559,7 +559,7 @@ def _add_compose(subparsers: argparse._SubParsersAction) -> None:
         help="prepare and clean up privileged bridge networks",
     )
     _add_common_directory(network)
-    network_sub = network.add_subparsers(dest="network_command", metavar="COMMAND")
+    network_sub = network.add_subparsers(dest="network_command", metavar="COMMAND", required=True)
     for name, help_text in (
         ("prepare", "create owned bridges (needs root/CAP_NET_ADMIN)"),
         ("cleanup", "remove owned bridges (needs root/CAP_NET_ADMIN)"),

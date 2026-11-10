@@ -51,9 +51,9 @@ def test_subcommands_are_registered() -> None:
         "clean",
         "kernel",
         "gdb",
-        "compose",
     ):
         assert parser.parse_args([name]).command == name
+    assert parser.parse_args(["compose", "validate"]).command == "compose"
 
 
 def test_kernel_subcommands_are_registered() -> None:

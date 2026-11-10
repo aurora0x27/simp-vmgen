@@ -115,7 +115,30 @@ def _cleanup_started(
             clear_member(service.root)
 
 
+def _project_name(args: Any) -> str:
+    try:
+        return load_compose(resolve_compose_root(getattr(args, "directory", None))).project.name
+    except SimpVmgenError:
+        return ""
+
+
 def compose_up(args: Any) -> int:
+    json_output = getattr(args, "json", False)
+    try:
+        return _compose_up(args)
+    except SimpVmgenError as exc:
+        if not json_output:
+            raise
+        print(
+            json.dumps(
+                {"project": _project_name(args), "state": "error", "error": str(exc)},
+                indent=2,
+            )
+        )
+        return 1
+
+
+def _compose_up(args: Any) -> int:
     root = resolve_compose_root(getattr(args, "directory", None))
     compose = load_compose(root)
     timeout = getattr(args, "timeout", None)
@@ -161,6 +184,7 @@ def compose_up(args: Any) -> int:
             write_member(service.root, root, name)
 
         failures = 0
+        failure_error = ""
         try:
             for name, service in compose.services.items():
                 print(f"==> up {name}", file=sys.stderr if json_output else sys.stdout)
@@ -183,9 +207,11 @@ def compose_up(args: Any) -> int:
                 except SimpVmgenError as exc:
                     _print_error(name, exc)
                     failures += 1
+                    failure_error = f"{name}: {exc}"
                     break
                 if result != 0:
                     failures += 1
+                    failure_error = f"{name}: up failed"
                     break
         except KeyboardInterrupt:
             _cleanup_started(compose, configs, preexisting)
@@ -193,6 +219,23 @@ def compose_up(args: Any) -> int:
 
         if failures:
             _cleanup_started(compose, configs, preexisting)
+            if json_output:
+                data = {
+                    name: runtime.status_data(compose.services[name].root, config)
+                    for name, config in configs.items()
+                }
+                print(
+                    json.dumps(
+                        {
+                            "project": compose.project.name,
+                            "state": "error",
+                            "error": failure_error or "one or more services failed",
+                            "networks": state.networks,
+                            "services": data,
+                        },
+                        indent=2,
+                    )
+                )
             return 1
 
     data = {

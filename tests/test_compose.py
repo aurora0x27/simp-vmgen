@@ -684,6 +684,14 @@ def test_compose_subcommands_are_registered() -> None:
     assert args.json is True
 
 
+@pytest.mark.parametrize("argv", [["compose"], ["compose", "network"]])
+def test_compose_requires_a_subcommand(argv: list[str]) -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit) as exc:
+        parser.parse_args(argv)
+    assert exc.value.code == 2
+
+
 def test_compose_show_reports_state_errors(tmp_path: Path) -> None:
     root = _base(tmp_path)
     ensure_state(load_compose(root))

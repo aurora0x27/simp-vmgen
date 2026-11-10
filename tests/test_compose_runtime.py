@@ -397,6 +397,17 @@ def test_config_override_bypasses_compose_marker(tmp_path: Path) -> None:
     )
 
 
+def test_compose_up_json_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _bridge_compose(tmp_path)
+    monkeypatch.setattr(compose_runtime, "bridge_exists", lambda name: False)
+    assert main(["-C", str(root), "compose", "up", "--json"]) == EXIT_ERROR
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["state"] == "error"
+    assert "missing bridge" in payload["error"]
+
+
 def test_compose_up_requires_prepared_bridge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

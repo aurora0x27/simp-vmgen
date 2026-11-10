@@ -137,6 +137,24 @@ lab/
 - Kernel `version` and `commit` are mutually exclusive.
 - Kernel `make_args` are passed through to every relevant `make` invocation.
 
+### Compose invariants
+
+- `vmgen-compose.toml` references independent service projects; compose owns
+  their experimental NICs. A service `vmgen.toml` must not define `[[network]]`
+  when referenced by compose.
+- Compose state lives under `<compose>/.simp-vmgen/compose/state.json`.
+  Socket endpoints are also registered in the user cache with a file lock;
+  bridge ownership is recorded in compose state.
+- Mutating lifecycle commands (`build`, `up`, `stop`, `down`) hold the compose
+  lock. `up` writes per-service membership markers; standalone `run` refuses to
+  start a marked service.
+- `down` releases socket state and clears markers, but owned bridges remain
+  until `compose network cleanup`. External bridges are never deleted.
+- Bridge preparation is explicit and privileged; the CLI never invokes `sudo`
+  automatically.
+- The single-VM runtime accepts an internal `config_override` used by compose.
+  It must remain equivalent to loading the same effective config from disk.
+
 ## Generated project behavior
 
 `new` writes:
@@ -298,7 +316,10 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 
 ## Current state
 
-M1–M5 of the original plan are implemented. There is no tracked TODO file;
-agent scratch context lives in `.agent/` (gitignored). Treat this document, the
-README, `docs/configuration.md`, and the tests as the maintained source of
-truth.
+The original single-VM plan and compose M0–M5 are implemented. Compose includes
+socket and bridge networking, lifecycle commands, privileged bridge management
+and the `examples/network-lab` topology. The compose work is unreleased; the
+latest release is 0.2.0. There is no tracked TODO file; agent scratch context
+lives in `.agent/` (gitignored). Treat this document, the README,
+`docs/configuration.md`, `docs/compose.md`, and the tests as the maintained
+source of truth.

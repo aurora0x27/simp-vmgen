@@ -1,0 +1,34 @@
+schema = 1
+mount = []
+
+[project]
+name = "target"
+
+[distro]
+name = "alpine"
+release = "3.22"
+arch = "x86_64"
+
+[vm]
+mem = "1G"
+cpus = 1
+disk = "8G"
+accel = "auto"
+display = "none"
+
+[ssh]
+enabled = true
+host = "127.0.0.1"
+port = "auto"
+user = "root"
+permit_root_login = true
+wait_timeout = 300
+
+[[users]]
+name = "root"
+password = "114514"
+
+[provision]
+timezone = "UTC"
+package_sets = ["base"]
+extra_packages = ["iproute2", "tcpdump", "netcat-openbsd"]

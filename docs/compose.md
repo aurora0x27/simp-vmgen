@@ -120,6 +120,21 @@ nearest directory containing `vmgen-compose.toml` is used.
 - `up` starts services sequentially and does not wait for application-level
   health checks.
 
+## Example
+
+The repository includes a three-node attacker/target/observer lab:
+
+```sh
+simp-vmgen -C examples/network-lab compose validate
+simp-vmgen -C examples/network-lab compose up --timeout 300
+simp-vmgen -C examples/network-lab compose guest attacker -- \
+    ip -brief addr
+```
+
+See [../examples/network-lab/README.md](../examples/network-lab/README.md) for
+capture commands, interface discovery, traffic visibility between socket and
+bridge backends, and bridge preparation.
+
 ## Service projects
 
 - `project` is resolved relative to the compose file and must contain
@@ -161,8 +176,23 @@ nearest directory containing `vmgen-compose.toml` is used.
   can be set explicitly. Derived MACs assume service project names are unique
   on the same segment.
 
-Bridge/TAP, `depends_on`, readiness ordering, application health checks and
-cross-host networking are not implemented yet.
+## Traffic visibility
+
+- Socket multicast behaves like a shared hub. A promiscuous observer can see
+  unicast frames between other VMs, which is useful for capture and classroom
+  network-attack exercises. It has no MAC-learning/forwarding-database
+  behavior and is not an access-control boundary between host processes.
+- A Linux bridge behaves like a switch with MAC learning. An observer normally
+  sees broadcasts and ARP, but not unicast traffic between other ports unless
+  you use an explicit attack, mirror port or similar technique.
+- Every service keeps a separate user-mode management NIC. SSH and outbound
+  package downloads use that path, not the lab LAN. A VM is not fully isolated
+  from external networks just because it has an experiment NIC.
+- Capture tools must exist inside the guest. Add them through
+  `provision.extra_packages` or install them after boot.
+
+`depends_on`, readiness ordering, application health checks and cross-host
+networking are not implemented yet.
 
 ## Standalone safety
 

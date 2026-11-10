@@ -220,7 +220,8 @@ Compose networks default to rootless socket multicast. A Linux bridge driver is
 also available for switch-style experiments; create and remove owned bridges
 with `compose network prepare/cleanup` under `sudo`. See
 [docs/compose.md](docs/compose.md) for the file format, lifecycle semantics and
-current limits.
+current limits, and [examples/network-lab](examples/network-lab/README.md) for a
+three-node attacker/target/observer lab.
 
 ## Inspecting a project
 

@@ -1,0 +1,27 @@
+schema = 1
+
+[project]
+name = "network-lab"
+description = "Three-node socket LAN for traffic and attack simulation"
+
+[networks.lan]
+driver = "socket"
+subnet = "192.168.77.0/24"
+
+[services.attacker]
+project = "./attacker"
+
+[services.attacker.networks.lan]
+address = "192.168.77.10/24"
+
+[services.target]
+project = "./target"
+
+[services.target.networks.lan]
+address = "192.168.77.20/24"
+
+[services.observer]
+project = "./observer"
+
+[services.observer.networks.lan]
+address = "192.168.77.30/24"

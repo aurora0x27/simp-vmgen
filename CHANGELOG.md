@@ -4,6 +4,29 @@ All notable changes to `simp-vmgen` are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Experimental `[[network]]` NICs for single-VM projects, using rootless QEMU
+  socket multicast or a Linux bridge.
+- Compose projects (`vmgen-compose.toml`) for validating, building, running,
+  inspecting, stopping and tearing down multiple VMs.
+- `compose network prepare/cleanup/status` for explicitly privileged bridge
+  creation, ownership tracking and diagnostics.
+- An attacker/target/observer example under `examples/network-lab`.
+
+### Changed
+
+- `[[network]]` now requires exactly one of `mcast` or `bridge`.
+- Compose-managed services are marked and refuse standalone `run`.
+
+### Notes
+
+- Socket multicast is the default rootless backend. Bridge networking needs a
+  prepared host, `qemu-bridge-helper` and privileged network preparation.
+- Release/versioning for the compose work has not been decided yet.
+
 ## [0.2.0] - 2026-11-06
 
 ### Added

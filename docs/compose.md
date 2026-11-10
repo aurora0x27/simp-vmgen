@@ -39,6 +39,18 @@ project = "./target"
 address = "192.168.77.20/24"
 ```
 
+Switch the network backend without changing service addresses or MACs:
+
+```toml
+[networks.lan]
+driver = "bridge"
+subnet = "192.168.77.0/24"
+# bridge = "br-existing"      # optional; otherwise compose owns a derived bridge
+```
+
+Run `sudo simp-vmgen compose network prepare` before the first bridge `up`, and
+`sudo simp-vmgen compose network cleanup` after `down`.
+
 ## Commands
 
 ```sh
@@ -52,6 +64,9 @@ simp-vmgen compose guest SERVICE [--user NAME] [--timeout SECONDS] -- CMD
 simp-vmgen compose logs SERVICE [-f] [--lines N] [--no-color]
 simp-vmgen compose stop [--json]
 simp-vmgen compose down [--json]
+simp-vmgen compose network prepare
+simp-vmgen compose network cleanup
+simp-vmgen compose network status [--json]
 ```
 
 - `validate` parses the compose file and every referenced service project. It
@@ -70,6 +85,14 @@ simp-vmgen compose down [--json]
   markers.
 - `down` stops every service, clears membership markers and releases the
   compose state and socket endpoints. Disks and guest overlays are preserved.
+  Owned bridge devices are not deleted by unprivileged `down`; it keeps their
+  state and prints the `network cleanup` command to run with `sudo`.
+- `network prepare` creates bridges owned by this compose project. It needs
+  root or `CAP_NET_ADMIN`.
+- `network cleanup` deletes only bridges recorded as owned, after all services
+  are stopped. It never deletes an external bridge.
+- `network status` reports bridge existence, ownership, privilege state,
+  `/dev/net/tun` and the QEMU bridge helper.
 
 `up`, `status`, `wait`, `stop` and `down` support `--json` where shown above.
 `--dry-run` is intentionally rejected for compose commands; the lifecycle
@@ -89,6 +112,9 @@ nearest directory containing `vmgen-compose.toml` is used.
   before the invocation are left alone.
 - If `down` cannot stop a service, it keeps the state file, registry entries and
   membership markers so the next `down` or `stop` can retry.
+- Bridge ownership is persisted in the compose state. `down` keeps state when
+  owned bridges remain so `network cleanup` can find them; cleanup removes the
+  state after the last owned bridge is gone.
 - A service whose process disappeared is reported as stopped; `up` starts it
   again and repeated `up`/`down` calls are idempotent.
 - `up` starts services sequentially and does not wait for application-level
@@ -113,10 +139,17 @@ nearest directory containing `vmgen-compose.toml` is used.
 
 - Each compose network has one IPv4 subnet. Overlapping subnets are rejected.
 - `driver = "socket"` uses the rootless QEMU socket multicast backend described
-  in [configuration.md](configuration.md#experimental-networks).
-- An explicit `mcast` is used as-is. Otherwise the first `compose show` derives
-  a stable multicast group and UDP port and records it in
+  in [configuration.md](configuration.md#experimental-networks). An explicit
+  `mcast` is used as-is; otherwise the first `compose show` derives a stable
+  multicast group and UDP port and records it in
   `.simp-vmgen/compose/state.json`.
+- `driver = "bridge"` uses a Linux bridge. With no `bridge` key, `network
+  prepare` derives and creates an owned bridge. With `bridge = "name"`, the
+  bridge must already exist and is never deleted by compose.
+- `network prepare` refuses to claim a pre-existing bridge that it did not
+  record as owned; set `bridge = "name"` to use such a bridge explicitly.
+- QEMU needs `qemu-bridge-helper`, `/dev/net/tun` and the helper allowlist
+  configured on the host. Run `compose network status` to inspect readiness.
 - Endpoint ownership is tracked in a small registry under the user cache
   directory, guarded by a file lock. A project reuses its persisted endpoint;
   different projects are kept on different endpoints. Registry entries whose

@@ -5,7 +5,20 @@ from pathlib import Path
 import pytest
 
 from simp_vmgen.cli import EXIT_ERROR, EXIT_OK, main
-from simp_vmgen.config import Config
+from simp_vmgen.config import Config, NetworkConfig
+from simp_vmgen.render import render_project
+
+
+def test_generated_readme_describes_network_backends(tmp_path: Path) -> None:
+    config = Config.default("lab")
+    config.networks = [
+        NetworkConfig("lan", dhcp=True, mcast="239.192.77.1:4789"),
+        NetworkConfig("back", dhcp=True, bridge="br0"),
+    ]
+    config.validate()
+    readme = {item.path: item.content for item in render_project(config)}["README.md"]
+    assert "multicast `239.192.77.1:4789`" in readme
+    assert "bridge `br0`" in readme
 
 
 def test_new_ubuntu_project(tmp_path: Path) -> None:

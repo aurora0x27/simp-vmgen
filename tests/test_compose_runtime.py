@@ -292,6 +292,72 @@ def test_compose_down_stops_stale_state_services(
     assert "stale" in stopped
 
 
+BRIDGE_TEXT = """schema = 1
+
+[project]
+name = "bridge-runtime"
+
+[networks.lan]
+driver = "bridge"
+subnet = "192.168.95.0/24"
+
+[services.a]
+project = "./a"
+
+[services.a.networks.lan]
+address = "192.168.95.10/24"
+
+[services.b]
+project = "./b"
+
+[services.b.networks.lan]
+address = "192.168.95.11/24"
+"""
+
+
+def _bridge_compose(tmp_path: Path) -> Path:
+    for name in ("a", "b"):
+        service = tmp_path / name
+        service.mkdir()
+        Config.default(name).save(service / "vmgen.toml")
+    (tmp_path / "vmgen-compose.toml").write_text(BRIDGE_TEXT, encoding="utf-8")
+    return tmp_path
+
+
+def test_compose_up_requires_prepared_bridge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _bridge_compose(tmp_path)
+    monkeypatch.setattr(compose_runtime, "bridge_exists", lambda name: False)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        compose_runtime.runtime, "up", lambda args: calls.append(Path(args.directory).name) or 0
+    )
+    with pytest.raises(Exception, match="network prepare"):
+        compose_runtime.compose_up(
+            SimpleNamespace(directory=str(root), no_build=True, timeout=None, json=False)
+        )
+    assert calls == []
+
+
+def test_compose_down_keeps_owned_bridge_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _bridge_compose(tmp_path)
+    state = ensure_state(load_compose(root))
+    bridge = state.bridges["lan"]
+    write_member(root / "a", root, "a")
+    monkeypatch.setattr(compose_runtime.runtime, "stop", lambda args: 0)
+
+    assert compose_runtime.compose_down(SimpleNamespace(directory=str(root), json=False)) == 0
+    remaining = load_state(root)
+    assert remaining is not None
+    assert remaining.owned_bridges == [bridge]
+    assert remaining.networks == {}
+    assert remaining.services == []
+    assert not member_marker(root / "a").exists()
+
+
 def test_compose_down_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -300,7 +366,11 @@ def test_compose_down_json(
     monkeypatch.setattr(compose_runtime.runtime, "stop", lambda args: 0)
     assert main(["-C", str(root), "compose", "down", "--json"]) == EXIT_OK
     payload = json.loads(capsys.readouterr().out)
-    assert payload == {"project": "runtime-lab", "state": "down"}
+    assert payload == {
+        "project": "runtime-lab",
+        "state": "down",
+        "owned_bridges": [],
+    }
 
 
 def test_compose_down_uses_state_when_config_is_broken(

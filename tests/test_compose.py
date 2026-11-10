@@ -226,6 +226,149 @@ address = "192.168.77.10/24"
         ensure_state(load_compose(second))
 
 
+BRIDGE = """schema = 1
+
+[project]
+name = "bridge-lab"
+
+[networks.lan]
+driver = "bridge"
+subnet = "192.168.93.0/24"
+bridge = "br-test"
+
+[services.attacker]
+project = "./attacker"
+
+[services.attacker.networks.lan]
+address = "192.168.93.10/24"
+"""
+
+
+def test_compose_bridge_topology_and_materialize(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _service(tmp_path / "attacker", "attacker")
+    root = _compose(tmp_path, BRIDGE)
+    assert main(["-C", str(root), "compose", "show", "--json"]) == EXIT_OK
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["networks"]["lan"]["driver"] == "bridge"
+    assert payload["networks"]["lan"]["bridge"] == "br-test"
+    assert payload["networks"]["lan"]["mcast"] is None
+
+    compose = load_compose(root)
+    state = ensure_state(compose)
+    config = materialize_service(compose, "attacker", state.networks, state.bridges)
+    assert config.networks[0].bridge == "br-test"
+    assert config.networks[0].mcast == ""
+
+
+def test_driver_switch_keeps_address_and_mac(tmp_path: Path) -> None:
+    socket_root = tmp_path / "socket"
+    _service(socket_root / "attacker", "attacker")
+    _compose(
+        socket_root,
+        """schema = 1
+
+[project]
+name = "socket-lab"
+
+[networks.lan]
+driver = "socket"
+subnet = "192.168.77.0/24"
+
+[services.attacker]
+project = "./attacker"
+
+[services.attacker.networks.lan]
+address = "192.168.77.10/24"
+""",
+    )
+    socket_compose = load_compose(socket_root)
+    socket_state = ensure_state(socket_compose)
+    socket_config = materialize_service(
+        socket_compose, "attacker", socket_state.networks, socket_state.bridges
+    )
+
+    bridge_root = tmp_path / "bridge"
+    _service(bridge_root / "attacker", "attacker")
+    _compose(
+        bridge_root,
+        """schema = 1
+
+[project]
+name = "bridge-lab"
+
+[networks.lan]
+driver = "bridge"
+subnet = "192.168.77.0/24"
+
+[services.attacker]
+project = "./attacker"
+
+[services.attacker.networks.lan]
+address = "192.168.77.10/24"
+""",
+    )
+    bridge_compose = load_compose(bridge_root)
+    bridge_state = ensure_state(bridge_compose)
+    bridge_config = materialize_service(
+        bridge_compose, "attacker", bridge_state.networks, bridge_state.bridges
+    )
+    assert socket_config.networks[0].address == bridge_config.networks[0].address
+    assert socket_config.networks[0].mac == bridge_config.networks[0].mac
+    assert socket_config.networks[0].mcast
+    assert bridge_config.networks[0].bridge
+
+
+def test_compose_rejects_bridge_with_socket_driver(tmp_path: Path) -> None:
+    _service(tmp_path / "attacker", "attacker")
+    root = _compose(
+        tmp_path,
+        """schema = 1
+
+[project]
+name = "bridge-lab"
+
+[networks.lan]
+driver = "socket"
+subnet = "192.168.93.0/24"
+bridge = "br-test"
+
+[services.attacker]
+project = "./attacker"
+""",
+    )
+    with pytest.raises(ComposeError, match="only valid with driver"):
+        load_compose(root)
+
+
+def test_compose_rejects_duplicate_bridge(tmp_path: Path) -> None:
+    _service(tmp_path / "attacker", "attacker")
+    root = _compose(
+        tmp_path,
+        """schema = 1
+
+[project]
+name = "bridge-lab"
+
+[networks.lan]
+driver = "bridge"
+subnet = "192.168.93.0/24"
+bridge = "br-test"
+
+[networks.back]
+driver = "bridge"
+subnet = "192.168.94.0/24"
+bridge = "br-test"
+
+[services.attacker]
+project = "./attacker"
+""",
+    )
+    with pytest.raises(ComposeError, match="duplicate bridge"):
+        load_compose(root)
+
+
 def test_compose_member_blocks_standalone_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -269,7 +412,7 @@ project = "./attacker"
     ("mutation", "message"),
     [
         (BASE.replace('subnet = "192.168.77.0/24"', 'subnet = "192.168.77.0/31"'), "two host"),
-        (BASE.replace('driver = "socket"', 'driver = "bridge"'), "not implemented"),
+        (BASE.replace('driver = "socket"', 'driver = "tap"'), "expected one of"),
         (
             BASE.replace('address = "192.168.77.20/24"', 'address = "192.168.78.20/24"'),
             "outside",

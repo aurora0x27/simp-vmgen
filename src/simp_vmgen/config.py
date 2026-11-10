@@ -307,6 +307,7 @@ class NetworkConfig:
     dhcp: bool = False
     mac: str = ""
     mcast: str = ""
+    bridge: str = ""
 
     def effective_mac(self, project: str) -> str:
         return self.mac or derive_mac(project, self.name)
@@ -676,6 +677,7 @@ class Config:
         seen_network_macs: set[str] = {derive_mac(self.project.name, "mgmt")}
         seen_network_addresses: set[str] = set()
         seen_network_mcast: set[str] = set()
+        seen_network_bridges: set[str] = set()
         seen_gateway = False
         for index, network in enumerate(self.networks):
             where = f"{source}.network[{index}]"
@@ -689,10 +691,20 @@ class Config:
             if effective_mac in seen_network_macs:
                 raise ConfigError(f"{where}.mac: duplicate MAC address {effective_mac!r}")
             seen_network_macs.add(effective_mac)
-            network.mcast = normalize_multicast_endpoint(network.mcast, f"{where}.mcast")
-            if network.mcast in seen_network_mcast:
-                raise ConfigError(f"{where}.mcast: duplicate multicast endpoint {network.mcast!r}")
-            seen_network_mcast.add(network.mcast)
+            if bool(network.mcast) == bool(network.bridge):
+                raise ConfigError(f"{where}: exactly one of mcast or bridge is required")
+            if network.mcast:
+                network.mcast = normalize_multicast_endpoint(network.mcast, f"{where}.mcast")
+                if network.mcast in seen_network_mcast:
+                    raise ConfigError(
+                        f"{where}.mcast: duplicate multicast endpoint {network.mcast!r}"
+                    )
+                seen_network_mcast.add(network.mcast)
+            if network.bridge:
+                network.bridge = normalize_network_name(network.bridge, f"{where}.bridge")
+                if network.bridge in seen_network_bridges:
+                    raise ConfigError(f"{where}.bridge: duplicate bridge {network.bridge!r}")
+                seen_network_bridges.add(network.bridge)
             if network.dhcp:
                 if network.address or network.gateway:
                     raise ConfigError(f"{where}: dhcp networks cannot set address or gateway")
@@ -884,10 +896,9 @@ class Config:
 
         networks: list[dict[str, Any]] = []
         for network in self.networks:
-            network_item: dict[str, Any] = {
-                "name": network.name,
-                "mcast": network.mcast,
-            }
+            network_item: dict[str, Any] = {"name": network.name}
+            if network.mcast:
+                network_item["mcast"] = network.mcast
             if network.dhcp:
                 network_item["dhcp"] = True
             else:
@@ -896,6 +907,8 @@ class Config:
                     network_item["gateway"] = network.gateway
             if network.mac:
                 network_item["mac"] = network.mac
+            if network.bridge:
+                network_item["bridge"] = network.bridge
             networks.append(network_item)
 
         provision: dict[str, Any] = {
@@ -1035,7 +1048,7 @@ def _parse_networks(value: Any, where: str) -> list[NetworkConfig]:
             raise ConfigError(f"{item_where}: expected a table")
         _unknown_keys(
             item,
-            {"name", "address", "gateway", "dhcp", "mac", "mcast"},
+            {"name", "address", "gateway", "dhcp", "mac", "mcast", "bridge"},
             item_where,
         )
         networks.append(
@@ -1045,7 +1058,8 @@ def _parse_networks(value: Any, where: str) -> list[NetworkConfig]:
                 gateway=_string(item, "gateway", item_where),
                 dhcp=_bool(item, "dhcp", item_where),
                 mac=_string(item, "mac", item_where),
-                mcast=_string(item, "mcast", item_where, required=True),
+                mcast=_string(item, "mcast", item_where),
+                bridge=_string(item, "bridge", item_where),
             )
         )
     return networks

@@ -88,6 +88,18 @@ def test_cloudimg_networks_tcg_snapshot(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
 
+def test_cloudimg_bridge_tcg_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = Config.default("golden")
+    config.networks = [
+        NetworkConfig("lan", address="192.168.77.10/24", bridge="br0"),
+    ]
+    config.validate()
+    _assert_snapshot(
+        "cloudimg-bridge-tcg.args",
+        _argv(monkeypatch, config, kvm=False, ssh_port=2222),
+    )
+
+
 def test_kernel_artifact_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
     config = Config.default("golden")
     config.kernel = KernelConfig(

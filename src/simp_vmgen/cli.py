@@ -554,6 +554,24 @@ def _add_compose(subparsers: argparse._SubParsersAction) -> None:
     _add_common_directory(down)
     down.add_argument("--json", action="store_true", help="machine-readable output")
 
+    network = compose_sub.add_parser(
+        "network",
+        help="prepare and clean up privileged bridge networks",
+    )
+    _add_common_directory(network)
+    network_sub = network.add_subparsers(dest="network_command", metavar="COMMAND")
+    for name, help_text in (
+        ("prepare", "create owned bridges (needs root/CAP_NET_ADMIN)"),
+        ("cleanup", "remove owned bridges (needs root/CAP_NET_ADMIN)"),
+        ("status", "show bridge readiness and ownership"),
+    ):
+        network_parser = network_sub.add_parser(name, help=help_text)
+        _add_common_directory(network_parser)
+        if name == "status":
+            network_parser.add_argument(
+                "--json", action="store_true", help="machine-readable output"
+            )
+
 
 def _add_completion(subparsers: argparse._SubParsersAction) -> None:
     p = subparsers.add_parser(

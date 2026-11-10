@@ -92,6 +92,30 @@ def test_cloud_init_network_config() -> None:
     assert "addresses" not in back
 
 
+def test_bridge_network_config() -> None:
+    config = _config(NetworkConfig("lan", dhcp=True, bridge="br0"))
+    resolved = resolve_networks(config)[0]
+    assert resolved.bridge == "br0"
+    assert resolved.mcast == ""
+    loaded = Config.loads(config.dumps())
+    assert loaded.networks[0].bridge == "br0"
+    assert 'bridge = "br0"' in config.dumps()
+
+
+def test_bridge_and_mcast_are_mutually_exclusive() -> None:
+    config = Config.default("lab")
+    config.networks = [
+        NetworkConfig(
+            "lan",
+            dhcp=True,
+            mcast="239.192.77.1:4789",
+            bridge="br0",
+        )
+    ]
+    with pytest.raises(ConfigError, match="exactly one of mcast or bridge"):
+        config.validate()
+
+
 def test_no_network_config_without_networks() -> None:
     assert cloud_init_network_config(_config()) == ""
 
@@ -126,7 +150,7 @@ def test_config_digest_tracks_networks() -> None:
     [
         (NetworkConfig("Lan", dhcp=True, mcast="239.192.77.1:4789"), "invalid network name"),
         (NetworkConfig("lo", dhcp=True, mcast="239.192.77.1:4789"), "reserved"),
-        (NetworkConfig("lan", dhcp=True), "expected a multicast endpoint"),
+        (NetworkConfig("lan", dhcp=True), "exactly one of mcast or bridge"),
         (NetworkConfig("lan", dhcp=True, mcast="192.168.1.1:4789"), "not a multicast"),
         (NetworkConfig("lan", dhcp=True, mcast="239.192.77.1:99999"), "invalid UDP port"),
         (
@@ -158,6 +182,10 @@ def test_config_digest_tracks_networks() -> None:
         (
             NetworkConfig("lan", dhcp=True, mac="bad", mcast="239.192.77.1:4789"),
             "invalid MAC",
+        ),
+        (
+            NetworkConfig("lan", dhcp=True, bridge="Br0"),
+            "invalid network name",
         ),
     ],
 )
@@ -195,6 +223,14 @@ def test_duplicate_network_fields_are_rejected() -> None:
     ]
     with pytest.raises(ConfigError, match="duplicate MAC"):
         duplicate_mac.validate()
+
+    duplicate_bridge = Config.default("lab")
+    duplicate_bridge.networks = [
+        NetworkConfig("lan", dhcp=True, bridge="br0"),
+        NetworkConfig("back", dhcp=True, bridge="br0"),
+    ]
+    with pytest.raises(ConfigError, match="duplicate bridge"):
+        duplicate_bridge.validate()
 
     duplicate_gateway = Config.default("lab")
     duplicate_gateway.networks = [

@@ -38,7 +38,7 @@ MEMBER_FILENAME = Path(".simp-vmgen") / "compose-member.json"
 
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _SERVICE_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
-_COMPOSE_DRIVERS = {"socket"}
+_COMPOSE_DRIVERS = {"socket", "bridge"}
 
 
 @dataclass(slots=True)
@@ -53,6 +53,7 @@ class ComposeNetwork:
     subnet: str
     driver: str = "socket"
     mcast: str = ""
+    bridge: str = ""
 
 
 @dataclass(slots=True)
@@ -88,6 +89,8 @@ class ComposeState:
     networks: dict[str, str] = field(default_factory=dict)
     services: list[str] = field(default_factory=list)
     service_roots: dict[str, str] = field(default_factory=dict)
+    bridges: dict[str, str] = field(default_factory=dict)
+    owned_bridges: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -159,25 +162,31 @@ def _from_dict(data: dict[str, Any], *, source: str, root: Path) -> ComposeConfi
         if not isinstance(raw, dict):
             raise ComposeError(f"{where}: expected a table")
         network_name = normalize_network_name(raw_name, where)
-        _unknown_keys(raw, {"driver", "subnet", "mcast"}, where)
-        driver = _string(raw, "driver", where, default="socket")
+        _unknown_keys(raw, {"driver", "subnet", "mcast", "bridge"}, where)
+        driver = _string(raw, "driver", where, default="bridge" if "bridge" in raw else "socket")
         if driver not in _COMPOSE_DRIVERS:
-            if driver == "bridge":
-                raise ComposeError(
-                    f'{where}.driver: bridge is not implemented yet; use driver = "socket"'
-                )
             raise ComposeError(
                 f"{where}.driver: expected one of {', '.join(sorted(_COMPOSE_DRIVERS))}"
             )
         subnet = _ipv4_subnet(_string(raw, "subnet", where, required=True), f"{where}.subnet")
         mcast = _string(raw, "mcast", where)
-        if mcast:
-            mcast = normalize_multicast_endpoint(mcast, f"{where}.mcast")
+        bridge = _string(raw, "bridge", where)
+        if driver == "socket":
+            if bridge:
+                raise ComposeError(f'{where}.bridge: only valid with driver = "bridge"')
+            if mcast:
+                mcast = normalize_multicast_endpoint(mcast, f"{where}.mcast")
+        else:
+            if mcast:
+                raise ComposeError(f'{where}.mcast: only valid with driver = "socket"')
+            if bridge:
+                bridge = normalize_network_name(bridge, f"{where}.bridge")
         networks[network_name] = ComposeNetwork(
             name=network_name,
             subnet=subnet,
             driver=driver,
             mcast=mcast,
+            bridge=bridge,
         )
 
     services_table = _table(data.get("services"), f"{source}.services")
@@ -271,6 +280,7 @@ def _validate(compose: ComposeConfig, *, source: str) -> None:
     seen_macs: dict[str, str] = {}
     seen_ports: dict[int, str] = {}
     seen_mcasts: dict[str, str] = {}
+    seen_bridges: dict[str, str] = {}
     for network in compose.networks.values():
         if network.mcast:
             if network.mcast in seen_mcasts:
@@ -278,6 +288,10 @@ def _validate(compose: ComposeConfig, *, source: str) -> None:
                     f"{source}.networks: duplicate multicast endpoint {network.mcast!r}"
                 )
             seen_mcasts[network.mcast] = network.name
+        if network.bridge:
+            if network.bridge in seen_bridges:
+                raise ComposeError(f"{source}.networks: duplicate bridge {network.bridge!r}")
+            seen_bridges[network.bridge] = network.name
     for service in compose.services.values():
         if service.root in seen_roots:
             raise ComposeError(
@@ -320,19 +334,39 @@ def _validate(compose: ComposeConfig, *, source: str) -> None:
 
 
 def materialize_service(
-    compose: ComposeConfig, service_name: str, endpoints: dict[str, str]
+    compose: ComposeConfig,
+    service_name: str,
+    endpoints: dict[str, str],
+    bridges: dict[str, str] | None = None,
 ) -> Config:
     service = compose.services[service_name]
-    missing = sorted(set(service.networks) - set(endpoints))
+    bridges = bridges or {}
+    missing = {
+        name
+        for name in service.networks
+        if compose.networks[name].driver == "bridge"
+        and name not in bridges
+        or compose.networks[name].driver == "socket"
+        and name not in endpoints
+    }
     if missing:
-        raise ComposeError(f"missing compose endpoints for {', '.join(missing)}")
+        raise ComposeError(f"missing compose endpoints for {', '.join(sorted(missing))}")
     config = Config.load(service.root / CONFIG_FILENAME)
     config.networks = [
         NetworkConfig(
             name=binding.network,
             address=binding.address,
             mac=binding.mac,
-            mcast=endpoints[binding.network],
+            mcast=(
+                endpoints[binding.network]
+                if compose.networks[binding.network].driver == "socket"
+                else ""
+            ),
+            bridge=(
+                bridges[binding.network]
+                if compose.networks[binding.network].driver == "bridge"
+                else ""
+            ),
         )
         for binding in service.networks.values()
     ]
@@ -372,6 +406,16 @@ def load_state(root: Path) -> ComposeState | None:
         isinstance(key, str) and isinstance(value, str) for key, value in service_roots.items()
     ):
         raise ComposeError(f"invalid compose state service roots in {path}")
+    bridges = data.get("bridges", {})
+    if not isinstance(bridges, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in bridges.items()
+    ):
+        raise ComposeError(f"invalid compose state bridges in {path}")
+    owned_bridges = data.get("owned_bridges", [])
+    if not isinstance(owned_bridges, list) or not all(
+        isinstance(item, str) for item in owned_bridges
+    ):
+        raise ComposeError(f"invalid compose state owned bridges in {path}")
     return ComposeState(
         schema=STATE_SCHEMA_VERSION,
         project=str(data.get("project", "")),
@@ -379,6 +423,8 @@ def load_state(root: Path) -> ComposeState | None:
         networks=dict(networks),
         services=list(services),
         service_roots=dict(service_roots),
+        bridges=dict(bridges),
+        owned_bridges=list(owned_bridges),
     )
 
 
@@ -396,6 +442,8 @@ def save_state(root: Path, state: ComposeState) -> None:
                     "networks": dict(sorted(state.networks.items())),
                     "services": sorted(state.services),
                     "service_roots": dict(sorted(state.service_roots.items())),
+                    "bridges": dict(sorted(state.bridges.items())),
+                    "owned_bridges": sorted(state.owned_bridges),
                 },
                 indent=2,
             )
@@ -427,7 +475,17 @@ def ensure_state_locked(compose: ComposeConfig) -> ComposeState:
         registry = _load_registry()
         _prune_registry(registry)
         endpoints: dict[str, str] = {}
+        bridges: dict[str, str] = {}
+        owned_bridges = set(state.owned_bridges)
         for name, network in compose.networks.items():
+            if network.driver == "bridge":
+                bridge = network.bridge or state.bridges.get(name) or derive_bridge_name(root, name)
+                bridges[name] = bridge
+                if network.bridge:
+                    owned_bridges.discard(bridge)
+                else:
+                    owned_bridges.add(bridge)
+                continue
             if network.mcast:
                 endpoint = network.mcast
                 _claim(registry, endpoint, root)
@@ -442,6 +500,8 @@ def ensure_state_locked(compose: ComposeConfig) -> ComposeState:
                 _release(registry, root, endpoint)
         _save_registry(registry)
     state.networks = endpoints
+    state.bridges = bridges
+    state.owned_bridges = sorted(owned_bridges)
     state.services = sorted(compose.services)
     state.service_roots = {name: str(service.root) for name, service in compose.services.items()}
     save_state(root, state)
@@ -464,7 +524,18 @@ def release_state_locked(root: Path) -> None:
         for endpoint in state.networks.values():
             _release(registry, root, endpoint)
         _save_registry(registry)
-    state_path(root).unlink(missing_ok=True)
+    state.networks = {}
+    state.services = []
+    state.service_roots = {}
+    if state.owned_bridges:
+        save_state(root, state)
+    else:
+        state_path(root).unlink(missing_ok=True)
+
+
+def derive_bridge_name(root: Path, network_name: str) -> str:
+    digest = hashlib.sha256(f"{root.resolve()}\0{network_name}\0bridge".encode()).hexdigest()
+    return f"svbr{digest[:8]}"
 
 
 def service_status(
@@ -475,10 +546,10 @@ def service_status(
         name: {
             "address": binding.address,
             "mac": binding.mac,
-            "mcast": state.networks[name],
+            "mcast": state.networks.get(name),
+            "bridge": state.bridges.get(name),
         }
         for name, binding in service.networks.items()
-        if name in state.networks
     }
     return {
         "name": service.name,
@@ -500,7 +571,8 @@ def show_data(compose: ComposeConfig, state: ComposeState) -> dict[str, object]:
             name: {
                 "driver": network.driver,
                 "subnet": network.subnet,
-                "mcast": state.networks[name],
+                "mcast": state.networks.get(name),
+                "bridge": state.bridges.get(name),
             }
             for name, network in compose.networks.items()
         },
@@ -519,16 +591,24 @@ def print_show(compose: ComposeConfig, state: ComposeState, *, json_output: bool
     print()
     print("networks:")
     for name, network in compose.networks.items():
-        print(f"  {name}: {network.driver} {network.subnet} mcast={state.networks[name]}")
+        endpoint = (
+            f"bridge={state.bridges[name]}"
+            if network.driver == "bridge"
+            else f"mcast={state.networks[name]}"
+        )
+        print(f"  {name}: {network.driver} {network.subnet} {endpoint}")
     print()
     print("services:")
     for name, service in compose.services.items():
         print(f"  {name}: {service.project} ({service.root})")
         for network_name, binding in service.networks.items():
-            print(
-                f"    {network_name}: {binding.address} "
-                f"mac={binding.mac} mcast={state.networks[network_name]}"
+            network = compose.networks[network_name]
+            endpoint = (
+                f"bridge={state.bridges[network_name]}"
+                if network.driver == "bridge"
+                else f"mcast={state.networks[network_name]}"
             )
+            print(f"    {network_name}: {binding.address} mac={binding.mac} {endpoint}")
 
 
 def compose_validate(args: Any) -> int:

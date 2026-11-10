@@ -112,9 +112,14 @@ def build_argv(
         management_device += f",mac={management_mac(config)}"
     argv += ["-netdev", netdev, "-device", management_device]
     for network in resolve_networks(config):
+        netdev = (
+            f"bridge,id={network.qemu_id},br={network.bridge}"
+            if network.bridge
+            else f"socket,id={network.qemu_id},mcast={network.mcast},localaddr=127.0.0.1"
+        )
         argv += [
             "-netdev",
-            f"socket,id={network.qemu_id},mcast={network.mcast},localaddr=127.0.0.1",
+            netdev,
             "-device",
             f"virtio-net-pci,netdev={network.qemu_id},mac={network.mac}",
         ]

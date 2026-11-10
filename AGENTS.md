@@ -18,7 +18,7 @@ Supported:
 
 - Ubuntu 24.04 and Alpine 3.22 cloud images
 - cloud-init provisioning, SSH, serial console, 9p volumes
-- multiple experimental NICs on rootless QEMU socket LANs
+- multiple experimental NICs on rootless QEMU socket LANs or Linux bridges
 - compose projects for building and running multiple VMs together
 - multiple users, root/password/key policy
 - kernel source fetch from a version or git commit
@@ -74,6 +74,7 @@ src/simp_vmgen/
 ├── network.py        resolved experimental NICs and cloud-init network config
 ├── compose.py        compose topology, endpoint registry and service state
 ├── compose_runtime.py compose lifecycle over the single-VM runtime
+├── compose_network.py privileged bridge prepare/cleanup/status
 ├── sshkeys.py        key generation and askpass helper
 ├── net.py            free-port allocation
 ├── layout.py         `.simp-vmgen/` paths

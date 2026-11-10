@@ -16,6 +16,7 @@ class ResolvedNetwork:
     gateway: str
     dhcp: bool
     mcast: str
+    bridge: str
     index: int
 
     @property
@@ -36,6 +37,7 @@ def resolve_networks(config: Config) -> list[ResolvedNetwork]:
             gateway=network.gateway,
             dhcp=network.dhcp,
             mcast=network.mcast,
+            bridge=network.bridge,
             index=index,
         )
         for index, network in enumerate(config.networks, start=1)
@@ -51,6 +53,7 @@ def network_fingerprint(config: Config) -> list[dict[str, object]]:
             "gateway": network.gateway,
             "dhcp": network.dhcp,
             "mcast": network.mcast,
+            "bridge": network.bridge,
         }
         for network in resolve_networks(config)
     ]

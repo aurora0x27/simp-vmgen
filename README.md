@@ -75,7 +75,7 @@ static busybox initramfs by default.
 | `log` | Show or follow the serial log (`-f`, `--lines`, `--no-color`) |
 | `status` / `stop` / `clean` | Inspect, stop or remove runtime state; `status --json`, `--check` |
 | `kernel fetch/config/build/rootfs/initramfs/status/clean` | Kernel workflow; `status --json` |
-| `compose validate` / `compose show` | Validate or inspect a multi-VM compose topology |
+| `compose ...` | Validate, build, run, inspect and clean up a multi-VM topology |
 | `gdb` | Connect to the QEMU gdb stub |
 | `completion bash\|zsh\|fish` | Print a shell completion script |
 
@@ -216,7 +216,9 @@ simp-vmgen compose guest attacker -- ping -c 3 192.168.77.20
 simp-vmgen compose down
 ```
 
-Bridge/TAP networking is still planned. See
+Compose networks default to rootless socket multicast. A Linux bridge driver is
+also available for switch-style experiments; create and remove owned bridges
+with `compose network prepare/cleanup` under `sudo`. See
 [docs/compose.md](docs/compose.md) for the file format, lifecycle semantics and
 current limits.
 

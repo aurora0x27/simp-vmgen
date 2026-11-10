@@ -117,20 +117,25 @@ table adds one NIC after the normal user-mode management NIC:
 name = "lan"
 address = "192.168.77.10/24"
 gateway = "192.168.77.1"          # optional
-mcast = "239.192.77.1:4789"
+mcast = "239.192.77.1:4789"        # socket backend
 
 [[network]]
 name = "back"
 dhcp = true
-mcast = "239.192.77.2:4789"
+bridge = "br-lab"                  # bridge backend
 ```
 
 - `name` must be a valid interface name: lowercase letter followed by lowercase
-  letters, digits, `_` or `-`, at most 15 characters. `lo` and `eth0` are
-  reserved.
+  letters, digits, `_` or `-`, at most 15 characters. `lo`, `eth0` and `mgmt`
+  are reserved.
+- Set exactly one backend: `mcast` or `bridge`.
 - `mcast` is a QEMU socket UDP multicast endpoint. All VMs using the same
   endpoint share one Ethernet segment. The transport is restricted to
   `127.0.0.1`, so it stays on the host and requires no root privileges.
+- `bridge` attaches the NIC to an existing Linux bridge. Creating the bridge and
+  allowing QEMU's `qemu-bridge-helper` to use it are host setup steps; they are
+  not done automatically. Compose projects can create and remove their own
+  bridges through the explicit `compose network prepare/cleanup` commands.
 - Use either a static `address` (IPv4 CIDR) or `dhcp = true`; they are mutually
   exclusive. IPv4 is supported; IPv6 is not configured yet.
 - `gateway` is optional, must belong to the static subnet, and only one
@@ -156,8 +161,10 @@ mcast = "239.192.77.2:4789"
   the matching modules, the extra NICs will not appear. Configure networking
   inside those images yourself.
 
-Bridge/TAP backends and compose orchestration are not implemented yet. The
-current backend only creates the QEMU socket link and guest configuration.
+Socket multicast is the rootless default and is suitable for most lab traffic
+and capture exercises. A Linux bridge provides switch semantics (MAC learning
+and a forwarding database) but needs a prepared bridge and host permissions.
+Compose can orchestrate either backend; see [compose.md](compose.md).
 
 ## Provisioning
 

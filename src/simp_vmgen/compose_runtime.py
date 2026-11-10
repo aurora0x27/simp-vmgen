@@ -27,6 +27,7 @@ from .compose import (
     resolve_compose_root,
     write_member,
 )
+from .compose_network import bridge_exists, compose_network_dispatch
 from .config import CONFIG_FILENAME, Config
 from .errors import SimpVmgenError
 from .layout import ProjectLayout
@@ -53,7 +54,7 @@ def _service_config(
 ) -> Config:
     service = compose.services[service_name]
     if state is not None and all(name in state.networks for name in service.networks):
-        return materialize_service(compose, service_name, state.networks)
+        return materialize_service(compose, service_name, state.networks, state.bridges)
     return _plain_config(service.root)
 
 
@@ -95,7 +96,7 @@ def compose_build(args: Any) -> int:
         state = ensure_state_locked(compose)
         for name, service in compose.services.items():
             print(f"==> build {name}")
-            config = materialize_service(compose, name, state.networks)
+            config = materialize_service(compose, name, state.networks, state.bridges)
             try:
                 result = runtime.build(
                     _args(service.root, config, dry_run=False, force=getattr(args, "force", False))
@@ -118,8 +119,20 @@ def compose_up(args: Any) -> int:
 
     with compose_lock(root):
         state = ensure_state_locked(compose)
+        missing_bridges = [
+            state.bridges[name]
+            for name, network in compose.networks.items()
+            if network.driver == "bridge" and not bridge_exists(state.bridges[name])
+        ]
+        if missing_bridges:
+            raise ComposeError(
+                "missing bridge(s): "
+                + ", ".join(missing_bridges)
+                + "; run `sudo simp-vmgen compose network prepare` first"
+            )
         configs = {
-            name: materialize_service(compose, name, state.networks) for name in compose.services
+            name: materialize_service(compose, name, state.networks, state.bridges)
+            for name in compose.services
         }
         preexisting = {
             name
@@ -404,14 +417,32 @@ def compose_down(args: Any) -> int:
             if service_root.is_dir():
                 clear_member(service_root)
         release_state_locked(root)
+        remaining = load_state(root)
 
     project_name = (
         compose.project.name
         if compose is not None
         else (initial_state.project if initial_state is not None else "compose")
     )
+    owned_bridges = remaining.owned_bridges if remaining is not None else []
+    if owned_bridges:
+        print(
+            "owned bridges remain: "
+            + ", ".join(owned_bridges)
+            + "; run `sudo simp-vmgen compose network cleanup`",
+            file=sys.stderr,
+        )
     if json_output:
-        print(json.dumps({"project": project_name, "state": "down"}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "project": project_name,
+                    "state": "down",
+                    "owned_bridges": owned_bridges,
+                },
+                indent=2,
+            )
+        )
     else:
         print(f"{project_name} is down")
     return 0
@@ -430,6 +461,7 @@ def compose_dispatch(args: Any) -> int:
         "logs": compose_logs,
         "stop": compose_stop,
         "down": compose_down,
+        "network": compose_network_dispatch,
     }
     handler = handlers.get(command)
     if handler is None:

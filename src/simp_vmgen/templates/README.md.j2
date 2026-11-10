@@ -35,11 +35,12 @@ you pass `--force`.
 {% if config.networks %}
 ## Experimental networks
 
-These interfaces use the rootless QEMU socket multicast backend. The first
-user-mode NIC remains the management interface for SSH and outbound access.
+These interfaces use the configured QEMU socket or Linux bridge backend. The
+first user-mode NIC remains the management interface for SSH and outbound
+access.
 
 {% for network in config.networks %}
-- `{{ network.name }}`: {% if network.dhcp %}DHCP{% else %}`{{ network.address }}`{% if network.gateway %}, gateway `{{ network.gateway }}`{% endif %}{% endif %}, MAC `{{ network.effective_mac(config.project.name) }}`, multicast `{{ network.mcast }}`
+- `{{ network.name }}`: {% if network.dhcp %}DHCP{% else %}`{{ network.address }}`{% if network.gateway %}, gateway `{{ network.gateway }}`{% endif %}{% endif %}, MAC `{{ network.effective_mac(config.project.name) }}`, {% if network.bridge %}bridge `{{ network.bridge }}`{% else %}multicast `{{ network.mcast }}`{% endif %}
 {% endfor %}
 
 {% endif %}

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 import time
@@ -14,7 +13,7 @@ from simp_vmgen.config import Config
 
 def test_pid_matches_qemu_accepts_qemu_shaped_process(tmp_path: Path) -> None:
     qemu = tmp_path / "qemu-system-x86_64"
-    shutil.copy2("/bin/cat", qemu)
+    qemu.symlink_to(sys.executable)
     process = subprocess.Popen([str(qemu)], stdin=subprocess.PIPE)
     try:
         cmdline = b""

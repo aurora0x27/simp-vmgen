@@ -353,8 +353,18 @@ def compose_stop(args: Any) -> int:
     json_output = getattr(args, "json", False)
     failures = 0
     with compose_lock(root):
-        for name, service in compose.services.items():
-            config = _layout_config(service.root)
+        state = load_state(root)
+        targets: dict[str, tuple[Path, Config]] = {
+            name: (service.root, _layout_config(service.root))
+            for name, service in compose.services.items()
+        }
+        if state is not None:
+            for name, root_text in state.service_roots.items():
+                service_root = Path(root_text)
+                if name not in targets and service_root.is_dir():
+                    targets[name] = (service_root, _layout_config(service_root))
+        stale = set(targets) - set(compose.services)
+        for name, (service_root, config) in targets.items():
             try:
                 output = (
                     contextlib.redirect_stdout(sys.stderr)
@@ -362,17 +372,21 @@ def compose_stop(args: Any) -> int:
                     else contextlib.nullcontext()
                 )
                 with output:
-                    result = runtime.stop(_args(service.root, config))
+                    result = runtime.stop(_args(service_root, config))
             except SimpVmgenError as exc:
                 _print_error(name, exc)
                 failures += 1
                 continue
             if result != 0:
                 failures += 1
+                continue
+            if name in stale:
+                with contextlib.suppress(SimpVmgenError):
+                    clear_member(service_root)
     if json_output:
         data = {
-            name: runtime.status_data(service.root, _plain_config(service.root))
-            for name, service in compose.services.items()
+            name: runtime.status_data(service_root, config)
+            for name, (service_root, config) in targets.items()
         }
         print(
             json.dumps(

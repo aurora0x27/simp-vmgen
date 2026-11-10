@@ -103,12 +103,31 @@ def _run_ip(argv: list[str], what: str) -> None:
         raise ComposeError(f"{what} failed: {detail}")
 
 
+_CAP_NET_ADMIN = 12
+
+
+def has_net_admin() -> bool:
+    try:
+        status = Path("/proc/self/status").read_text(encoding="utf-8")
+    except OSError:
+        return False
+    for line in status.splitlines():
+        if line.startswith("CapEff:"):
+            try:
+                return bool(int(line.split()[1], 16) & (1 << _CAP_NET_ADMIN))
+            except (IndexError, ValueError):
+                return False
+    return False
+
+
 def _require_privilege(action: str) -> None:
-    if hasattr(os, "geteuid") and os.geteuid() != 0:
-        raise ComposeError(
-            f"compose network {action} needs root or CAP_NET_ADMIN; "
-            f"run it with sudo, for example: sudo simp-vmgen compose network {action}"
-        )
+    root = hasattr(os, "geteuid") and os.geteuid() == 0
+    if root or has_net_admin():
+        return
+    raise ComposeError(
+        f"compose network {action} needs root or CAP_NET_ADMIN; "
+        f"run it with sudo, for example: sudo simp-vmgen compose network {action}"
+    )
 
 
 def _layout_config(service_root: Path) -> Config:

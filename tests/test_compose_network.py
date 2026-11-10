@@ -221,6 +221,30 @@ def test_prepare_rolls_back_created_bridge(tmp_path: Path, monkeypatch: pytest.M
     assert load_state(root) is None
 
 
+def test_prepare_accepts_cap_net_admin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _compose(tmp_path)
+    existing: set[str] = set()
+    commands: list[list[str]] = []
+    run, exists = _fake_ip(existing, commands)
+    monkeypatch.setattr(compose_network.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(compose_network, "has_net_admin", lambda: True)
+    monkeypatch.setattr(compose_network, "bridge_exists", exists)
+    monkeypatch.setattr(compose_network, "_run_ip", run)
+    monkeypatch.setattr(compose_network, "_require_bridge_type", lambda name: None)
+    monkeypatch.setattr(compose_network, "fix_compose_ownership", lambda root: None)
+    assert compose_network.compose_network_prepare(SimpleNamespace(directory=str(root))) == 0
+    assert any("add" in command for command in commands)
+
+
+def test_registry_schema_is_validated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _compose(tmp_path)
+    registry = tmp_path / "cache" / "simp-vmgen" / "compose" / "endpoints.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text('{"schema": 99, "endpoints": {}}', encoding="utf-8")
+    with pytest.raises(ComposeError, match="registry schema"):
+        ensure_state(load_compose(root))
+
+
 def test_prepare_requires_privilege(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = _compose(tmp_path)
     monkeypatch.setattr(compose_network.os, "geteuid", lambda: 1000)

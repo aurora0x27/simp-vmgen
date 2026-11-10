@@ -13,6 +13,7 @@ from simp_vmgen.compose import (
     load_compose,
     load_state,
     member_marker,
+    save_state,
     state_path,
     write_member,
 )
@@ -462,6 +463,31 @@ def test_compose_down_uses_state_when_config_is_broken(
     assert stopped == ["a", "b"]
     assert not state_path(root).exists()
     assert not member_marker(root / "a").exists()
+
+
+def test_compose_stop_includes_stale_state_services(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _compose(tmp_path)
+    stale = tmp_path / "stale"
+    stale.mkdir()
+    Config.default("stale").save(stale / "vmgen.toml")
+    state = ensure_state(load_compose(root))
+    state.service_roots["stale"] = str(stale)
+    save_state(root, state)
+    write_member(stale, root, "stale")
+    write_member(root / "a", root, "a")
+
+    stopped: list[str] = []
+    monkeypatch.setattr(
+        compose_runtime.runtime,
+        "stop",
+        lambda args: stopped.append(Path(args.directory).name) or 0,
+    )
+    assert compose_runtime.compose_stop(SimpleNamespace(directory=str(root), json=False)) == 0
+    assert "stale" in stopped
+    assert not member_marker(stale).exists()
+    assert member_marker(root / "a").exists()
 
 
 def test_compose_stop_failure_keeps_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

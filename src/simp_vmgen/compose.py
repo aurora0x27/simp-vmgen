@@ -31,6 +31,7 @@ from .errors import ComposeError, ConfigError
 COMPOSE_FILENAME = "vmgen-compose.toml"
 COMPOSE_SCHEMA_VERSION = 1
 STATE_SCHEMA_VERSION = 1
+REGISTRY_SCHEMA_VERSION = 1
 COMPOSE_DIR = Path(".simp-vmgen") / "compose"
 STATE_FILENAME = "state.json"
 LOCK_FILENAME = "lock"
@@ -95,7 +96,7 @@ class ComposeState:
 
 @dataclass(slots=True)
 class _EndpointRegistry:
-    schema: int = 1
+    schema: int = REGISTRY_SCHEMA_VERSION
     endpoints: dict[str, str] = field(default_factory=dict)
 
 
@@ -772,6 +773,12 @@ def _load_registry() -> _EndpointRegistry:
         raise ComposeError(f"cannot read compose endpoint registry {path}: {exc}") from exc
     if not isinstance(data, dict) or not isinstance(data.get("endpoints", {}), dict):
         raise ComposeError(f"invalid compose endpoint registry {path}")
+    schema = data.get("schema")
+    if schema != REGISTRY_SCHEMA_VERSION:
+        raise ComposeError(
+            f"{path}: unsupported compose endpoint registry schema {schema!r} "
+            f"(expected {REGISTRY_SCHEMA_VERSION})"
+        )
     endpoints = data.get("endpoints", {})
     if not all(isinstance(k, str) and isinstance(v, str) for k, v in endpoints.items()):
         raise ComposeError(f"invalid compose endpoint registry {path}")

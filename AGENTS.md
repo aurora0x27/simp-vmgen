@@ -329,9 +329,9 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 
 The original single-VM plan and compose M0–M5 are implemented. Compose includes
 socket and bridge networking, lifecycle commands, privileged bridge management
-and the `examples/network-lab` topology. AArch64/openEuler support is being
-added for 0.4.0. The latest release is 0.3.1. There is
-no tracked TODO file; agent scratch context lives in `.agent/` (gitignored).
-Treat this document, the README,
+and the `examples/network-lab` topology. AArch64/openEuler cloud-image support is
+included in 0.3.2. The latest release is 0.3.2. There is no tracked TODO file;
+agent scratch context lives in `.agent/` (gitignored). Treat this document, the
+README,
 `docs/configuration.md`, `docs/compose.md`, and the tests as the maintained
 source of truth.

@@ -135,6 +135,7 @@ def build(args: Any) -> int:
         lock.image_filename,
         checksum=lock.image_checksum,
         checksum_url=lock.image_checksum_url,
+        compression=release.image_compression,
     )
     if checksum and checksum != lock.image_checksum:
         lock.image_checksum = checksum

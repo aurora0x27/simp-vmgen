@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
+import lzma
 import os
 import sys
 from collections.abc import Iterator
@@ -174,6 +176,32 @@ def _download_to(url: str, target: Path) -> None:
         response.close()
 
 
+def _decompressed_path(target: Path, compression: str) -> Path:
+    suffix = f".{compression}"
+    if not target.name.endswith(suffix):
+        raise CacheError(f"cannot decompress {target.name}: expected a {suffix} suffix")
+    return target.with_name(target.name[: -len(suffix)])
+
+
+def _decompress(source: Path, target: Path, compression: str) -> None:
+    opener = lzma.open if compression == "xz" else gzip.open if compression == "gz" else None
+    if opener is None:
+        raise CacheError(f"unsupported image compression {compression!r}")
+    tmp = target.with_name(f"{target.name}.part")
+    tmp.unlink(missing_ok=True)
+    try:
+        with opener(source, "rb") as src, tmp.open("wb") as dst:
+            while True:
+                chunk = src.read(_CHUNK_SIZE)
+                if not chunk:
+                    break
+                dst.write(chunk)
+        os.replace(tmp, target)
+    except (OSError, EOFError, lzma.LZMAError) as exc:
+        tmp.unlink(missing_ok=True)
+        raise CacheError(f"cannot decompress {source} to {target}: {exc}") from exc
+
+
 def download(
     url: str,
     filename: str,
@@ -182,6 +210,7 @@ def download(
     checksum_url: str = "",
     allow_unverified: bool = False,
     directory: Path | None = None,
+    compression: str = "",
 ) -> tuple[Path, str]:
     """Return the cached image path and the checksum used for verification."""
     filename = Path(filename).name
@@ -193,8 +222,18 @@ def download(
 
     with file_lock(lock_path):
         if target.exists() and checksum and verify_checksum(target, checksum):
+            if compression:
+                path = _decompressed_path(target, compression)
+                if not path.is_file():
+                    _decompress(target, path, compression)
+                return path, checksum
             return target, checksum
         if target.exists() and not checksum and allow_unverified:
+            if compression:
+                path = _decompressed_path(target, compression)
+                if not path.is_file():
+                    _decompress(target, path, compression)
+                return path, ""
             return target, ""
 
         resolved = checksum or resolve_checksum(checksum_url, filename)
@@ -204,6 +243,11 @@ def download(
             )
         if target.exists() and resolved and verify_checksum(target, resolved):
             target.with_name(f"{target.name}.part").unlink(missing_ok=True)
+            if compression:
+                path = _decompressed_path(target, compression)
+                if not path.is_file():
+                    _decompress(target, path, compression)
+                return path, resolved
             return target, resolved
 
         part = target.with_name(f"{target.name}.part")
@@ -212,4 +256,8 @@ def download(
             part.unlink(missing_ok=True)
             raise CacheError(f"checksum mismatch for {filename}: expected {resolved}")
         os.replace(part, target)
+        if compression:
+            path = _decompressed_path(target, compression)
+            _decompress(target, path, compression)
+            return path, resolved
         return target, resolved

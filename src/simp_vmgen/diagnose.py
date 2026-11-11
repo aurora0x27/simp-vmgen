@@ -312,10 +312,12 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
         selected = "base"
 
     checks: list[CheckResult] = [_check_python()]
+    image_compression = ""
     if config is not None:
         try:
             distro = load_distro(config.distro.name)
             release = distro.release(config.distro.release)
+            image_compression = release.image_compression
         except SimpVmgenError as exc:
             checks.append(CheckResult("distro", "missing", detail=str(exc)))
         else:
@@ -339,6 +341,8 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
                     detail=f"{len(mounts)} configured",
                 )
             )
+    if image_compression == "xz":
+        checks.append(_check_tool("xz"))
     checks.append(_check_tool(f"qemu-system-{arch}", version_args=("--version",)))
     checks.append(_check_tool("qemu-img", version_args=("--version",)))
     checks.append(_check_tool("tar"))

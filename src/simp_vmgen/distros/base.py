@@ -40,6 +40,7 @@ _RELEASE_KEYS = {
     "image_checksum",
     "image_checksum_url",
     "image_format",
+    "image_compression",
     "default_mem",
     "default_cpus",
     "default_disk",
@@ -120,6 +121,7 @@ class DistroRelease:
     image_checksum: str = ""
     image_checksum_url: str = ""
     image_format: str = "qcow2"
+    image_compression: str = ""
     default_mem: str = "4G"
     default_cpus: int = 4
     default_disk: str = "20G"
@@ -240,6 +242,9 @@ def _parse_release(value: Any, where: str) -> DistroRelease:
     image_format = _string(table, "image_format", where, default="qcow2")
     if image_format not in ("qcow2", "raw"):
         raise DistroError(f"{where}.image_format: expected qcow2 or raw")
+    image_compression = _string(table, "image_compression", where)
+    if image_compression not in ("", "xz", "gz"):
+        raise DistroError(f"{where}.image_compression: expected xz or gz")
 
     machines_table = _table(table.get("machines", {}), f"{where}.machines")
     machines: dict[str, str] = {}
@@ -256,6 +261,7 @@ def _parse_release(value: Any, where: str) -> DistroRelease:
         image_checksum=checksum,
         image_checksum_url=checksum_url,
         image_format=image_format,
+        image_compression=image_compression,
         default_mem=_size(table.get("default_mem", "4G"), f"{where}.default_mem"),
         default_cpus=_int(table, "default_cpus", where, default=4, minimum=1),
         default_disk=_size(table.get("default_disk", "20G"), f"{where}.default_disk"),

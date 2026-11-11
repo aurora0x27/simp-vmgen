@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import http.server
+import lzma
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -105,6 +106,30 @@ def test_download_rejects_bad_checksum(
             checksum=f"sha256:{'0' * 64}",
         )
     assert not (tmp_path / "images" / "image.qcow2.part").exists()
+
+
+def test_download_decompresses_xz(tmp_path: Path, http_server: str) -> None:
+    compressed = lzma.compress(PAYLOAD)
+    (tmp_path / "image.qcow2.xz").write_bytes(compressed)
+    checksum = hashlib.sha256(compressed).hexdigest()
+    (tmp_path / "SHA256SUMS").write_text(f"{checksum}  image.qcow2.xz\n", encoding="utf-8")
+    path, _ = cache.download(
+        f"{http_server}/image.qcow2.xz",
+        "image.qcow2.xz",
+        checksum_url=f"{http_server}/SHA256SUMS",
+        directory=tmp_path,
+        compression="xz",
+    )
+    assert path.name == "image.qcow2"
+    assert path.read_bytes() == PAYLOAD
+    again, _ = cache.download(
+        f"{http_server}/image.qcow2.xz",
+        "image.qcow2.xz",
+        checksum_url=f"{http_server}/SHA256SUMS",
+        directory=tmp_path,
+        compression="xz",
+    )
+    assert again == path
 
 
 def test_download_requires_checksum(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

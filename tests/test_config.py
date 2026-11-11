@@ -49,6 +49,14 @@ readonly = true
 """
 
 
+def test_vm_firmware_round_trip() -> None:
+    config = Config.default("lab")
+    config.vm.firmware = "/usr/share/edk2/aarch64/QEMU_EFI.fd"
+    config.validate()
+    loaded = Config.loads(config.dumps())
+    assert loaded.vm.firmware == config.vm.firmware
+
+
 def test_default_config_is_root_login() -> None:
     config = Config.default("Week6")
     config.validate()

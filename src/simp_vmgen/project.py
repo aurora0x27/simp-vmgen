@@ -163,7 +163,7 @@ def config_from_args(args: argparse.Namespace, target: Path) -> Config:
             cpus=args.cpus or release.default_cpus,
             disk=args.disk or release.default_disk,
             accel=args.accel,
-            machine=release.machine,
+            machine=release.machine_for(args.arch),
         ),
         ssh=SshConfig(
             port=args.ssh_port,
@@ -323,6 +323,7 @@ def regen_project(args: argparse.Namespace) -> int:
 def show_project(args: argparse.Namespace) -> int:
     root, config = load_project(args.directory)
     distro = load_distro(config.distro.name)
+    distro.validate_arch(config.distro.arch)
     distro.release(config.distro.release)
     layout = ProjectLayout(root, config)
     lock_path = root / LOCK_FILENAME

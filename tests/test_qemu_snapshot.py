@@ -8,6 +8,7 @@ import pytest
 from simp_vmgen import kernel, qemu
 from simp_vmgen.config import Config, KernelConfig, NetworkConfig
 from simp_vmgen.distros import load_distro
+from simp_vmgen.errors import ProjectError
 from simp_vmgen.layout import ProjectLayout
 from simp_vmgen.mounts import ResolvedMount
 
@@ -84,6 +85,47 @@ def test_cloudimg_networks_tcg_snapshot(monkeypatch: pytest.MonkeyPatch) -> None
     config.validate()
     _assert_snapshot(
         "cloudimg-networks-tcg.args",
+        _argv(monkeypatch, config, kvm=False, ssh_port=2222),
+    )
+
+
+def test_cross_arch_accel(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = Config.default("golden")
+    config.distro.arch = "aarch64"
+    monkeypatch.setattr(qemu, "host_arch", lambda: "x86_64")
+    monkeypatch.setattr(qemu, "kvm_available", lambda: True)
+    assert qemu.resolve_accel(config) == ("tcg", "max")
+    config.vm.accel = "kvm"
+    with pytest.raises(ProjectError, match="KVM cannot run"):
+        qemu.resolve_accel(config)
+
+
+def test_cloudimg_aarch64_tcg_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = Config.default("golden")
+    config.distro.arch = "aarch64"
+    config.vm.accel = "tcg"
+    config.validate()
+    monkeypatch.setattr(qemu, "firmware_path", lambda *args: Path("/firmware/QEMU_EFI.fd"))
+    _assert_snapshot(
+        "cloudimg-aarch64-tcg.args",
+        _argv(monkeypatch, config, kvm=False, ssh_port=2222),
+    )
+
+
+def test_kernel_artifact_aarch64_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = Config.default("golden")
+    config.distro.arch = "aarch64"
+    config.vm.accel = "tcg"
+    config.kernel = KernelConfig(
+        enabled=True,
+        mode="artifact",
+        artifact="/images/Image",
+        artifact_type="Image",
+        initrd="/images/initrd",
+    )
+    config.validate()
+    _assert_snapshot(
+        "kernel-artifact-aarch64-tcg.args",
         _argv(monkeypatch, config, kvm=False, ssh_port=2222),
     )
 

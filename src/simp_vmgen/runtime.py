@@ -59,6 +59,7 @@ def _load_args(args: Any) -> tuple[Path, Config]:
 
 def _load_distro(config: Config) -> tuple[Distro, DistroRelease]:
     distro = load_distro(config.distro.name)
+    distro.validate_arch(config.distro.arch)
     return distro, distro.release(config.distro.release)
 
 

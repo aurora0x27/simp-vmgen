@@ -42,6 +42,14 @@ def test_alpine_metadata() -> None:
     assert "nocloud_alpine-3.22.0-x86_64-bios-cloudinit-r0.qcow2" in image
 
 
+def test_arch_validation_and_machine_fallback() -> None:
+    distro = load_distro("ubuntu")
+    release = distro.release()
+    assert release.machine_for("x86_64") == "q35"
+    with pytest.raises(DistroError, match="does not support architecture"):
+        distro.validate_arch("riscv64")
+
+
 def test_packages_are_merged_and_deduplicated() -> None:
     distro = load_distro("ubuntu")
     packages = distro.packages(["base", "dev"], ["clang", "zsh"])

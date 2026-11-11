@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .arch import arch_profile, firmware_path, host_arch
 from .config import Config
 from .distros import Distro, DistroRelease
 from .errors import ProjectError
@@ -19,15 +20,19 @@ def kvm_available() -> bool:
 
 
 def resolve_accel(config: Config) -> tuple[str, str]:
+    profile = arch_profile(config.distro.arch)
+    native = config.distro.arch == host_arch()
     if config.vm.accel == "kvm":
+        if not native:
+            raise ProjectError(f"KVM cannot run {config.distro.arch} on a {host_arch()} host")
         if not kvm_available():
             raise ProjectError("KVM was requested but /dev/kvm is not writable")
-        return "kvm", "host"
+        return "kvm", profile.cpu_kvm
     if config.vm.accel == "tcg":
-        return "tcg", "max"
-    if kvm_available():
-        return "kvm", "host"
-    return "tcg", "max"
+        return "tcg", profile.cpu_tcg
+    if native and kvm_available():
+        return "kvm", profile.cpu_kvm
+    return "tcg", profile.cpu_tcg
 
 
 def build_argv(
@@ -42,12 +47,13 @@ def build_argv(
     snapshot: bool = False,
     dry_run: bool = False,
 ) -> list[str]:
+    profile = arch_profile(config.distro.arch)
     accel, cpu = resolve_accel(config)
-    machine = config.vm.machine or release.machine or "q35"
+    machine = config.vm.machine or release.machine_for(config.distro.arch) or profile.machine
     mounts = resolve_mounts(config, layout.root)
 
     argv = [
-        f"qemu-system-{config.distro.arch}",
+        profile.binary,
         "-name",
         config.project.hostname,
         "-machine",
@@ -62,10 +68,15 @@ def build_argv(
         "base=utc",
     ]
 
+    if not config.kernel.enabled:
+        firmware = firmware_path(config.vm.firmware, config.distro.arch, layout.root)
+        if firmware is not None:
+            argv += ["-bios", str(firmware)]
+
     if config.kernel.enabled:
         from .kernel import built_image_path, kernel_image_path, kernel_initrd_path
 
-        append = "console=ttyS0 panic=-1"
+        append = f"console={profile.console} panic=-1"
         if not config.kernel.initrd:
             append += " rdinit=/init"
         if config.kernel.append:

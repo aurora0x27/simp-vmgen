@@ -253,6 +253,7 @@ class VmConfig:
     accel: str = "auto"
     display: str = "none"
     machine: str = ""
+    firmware: str = ""
     snapshot: bool = False
 
 
@@ -452,7 +453,7 @@ class Config:
         vm_table = _table(data.get("vm"), f"{source}.vm")
         _unknown_keys(
             vm_table,
-            {"mem", "cpus", "disk", "accel", "display", "machine", "snapshot"},
+            {"mem", "cpus", "disk", "accel", "display", "machine", "firmware", "snapshot"},
             f"{source}.vm",
         )
         vm = VmConfig(
@@ -462,6 +463,7 @@ class Config:
             accel=_string(vm_table, "accel", f"{source}.vm", default="auto"),
             display=_string(vm_table, "display", f"{source}.vm", default="none"),
             machine=_string(vm_table, "machine", f"{source}.vm"),
+            firmware=_string(vm_table, "firmware", f"{source}.vm"),
             snapshot=_bool(vm_table, "snapshot", f"{source}.vm"),
         )
         if vm.accel not in _VM_ACCELS:
@@ -847,6 +849,8 @@ class Config:
         }
         if self.vm.machine:
             vm["machine"] = self.vm.machine
+        if self.vm.firmware:
+            vm["firmware"] = self.vm.firmware
         if self.vm.snapshot:
             vm["snapshot"] = True
 

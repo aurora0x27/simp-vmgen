@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -44,6 +44,7 @@ _RELEASE_KEYS = {
     "default_cpus",
     "default_disk",
     "machine",
+    "machines",
 }
 
 
@@ -123,6 +124,12 @@ class DistroRelease:
     default_cpus: int = 4
     default_disk: str = "20G"
     machine: str = ""
+    machines: dict[str, str] = field(default_factory=dict)
+
+    def machine_for(self, arch: str) -> str:
+        if arch in self.machines:
+            return self.machines[arch]
+        return self.machine if arch == "x86_64" else ""
 
     def image_url_for(self, arch: str) -> str:
         try:
@@ -171,6 +178,14 @@ class Distro:
         raise DistroError(
             f"distro {self.name!r} has no release {wanted!r} (available: {available})"
         )
+
+    def validate_arch(self, arch: str) -> None:
+        if arch not in self.architectures:
+            supported = ", ".join(self.architectures)
+            raise DistroError(
+                f"distro {self.name!r} does not support architecture {arch!r} "
+                f"(supported: {supported})"
+            )
 
     def image_arch(self, arch: str) -> str:
         return self.image_arches.get(arch, arch)
@@ -226,6 +241,15 @@ def _parse_release(value: Any, where: str) -> DistroRelease:
     if image_format not in ("qcow2", "raw"):
         raise DistroError(f"{where}.image_format: expected qcow2 or raw")
 
+    machines_table = _table(table.get("machines", {}), f"{where}.machines")
+    machines: dict[str, str] = {}
+    for arch, machine in machines_table.items():
+        if not isinstance(arch, str) or not arch.strip():
+            raise DistroError(f"{where}.machines: invalid architecture {arch!r}")
+        if not isinstance(machine, str) or not machine.strip():
+            raise DistroError(f"{where}.machines.{arch}: expected a non-empty string")
+        machines[arch] = machine
+
     return DistroRelease(
         version=version,
         image_url=image_url,
@@ -236,6 +260,7 @@ def _parse_release(value: Any, where: str) -> DistroRelease:
         default_cpus=_int(table, "default_cpus", where, default=4, minimum=1),
         default_disk=_size(table.get("default_disk", "20G"), f"{where}.default_disk"),
         machine=_string(table, "machine", where),
+        machines=machines,
     )
 
 
@@ -277,6 +302,13 @@ def _parse_distro(data: dict[str, Any], *, source: str) -> Distro:
     versions = [release.version for release in releases]
     if len(set(versions)) != len(versions):
         raise DistroError(f"{source}.release: duplicate release versions")
+    for release in releases:
+        unknown = sorted(set(release.machines) - set(architectures))
+        if unknown:
+            raise DistroError(
+                f"{source}.release: machine override for unsupported architectures: "
+                f"{', '.join(unknown)}"
+            )
 
     default_release = _string(data, "default_release", source, default=releases[0].version)
     if default_release not in versions:

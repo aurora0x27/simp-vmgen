@@ -210,7 +210,9 @@ def _from_dict(data: dict[str, Any], *, source: str, root: Path) -> ComposeConfi
             raise ComposeError(f"{where}.project: no {CONFIG_FILENAME} in {service_root}")
         config = Config.load(config_path)
         config.validate()
-        load_distro(config.distro.name).release(config.distro.release)
+        distro = load_distro(config.distro.name)
+        distro.validate_arch(config.distro.arch)
+        distro.release(config.distro.release)
         if config.networks:
             raise ComposeError(
                 f"{where}.project: {config_path} already defines [[network]]; "

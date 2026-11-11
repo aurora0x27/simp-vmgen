@@ -42,9 +42,9 @@ The generated defaults use a `root` account with password `114514`, timezone
 |---|---|
 | `project.name` | Project and hostname base |
 | `project.description` | Optional description |
-| `distro.name` | `ubuntu` or `alpine` |
-| `distro.release` | e.g. `24.04`, `3.22` |
-| `distro.arch` | `x86_64` |
+| `distro.name` | `ubuntu`, `alpine` or `openeuler` |
+| `distro.release` | e.g. `24.04`, `3.22`, `24.03-LTS` |
+| `distro.arch` | `x86_64` or `aarch64` |
 | `distro.image` | Optional image URL override |
 | `distro.image_checksum` | Optional `sha256:...` / `sha512:...` |
 
@@ -58,7 +58,20 @@ The generated defaults use a `root` account with password `114514`, timezone
 | `vm.accel` | `auto`, `kvm` or `tcg` |
 | `vm.display` | `none`, `gtk`, `sdl` or `vnc` |
 | `vm.machine` | Optional machine override |
+| `vm.firmware` | Optional UEFI firmware path; aarch64 defaults to `QEMU_EFI.fd` |
 | `vm.snapshot` | Discard writes on exit |
+
+## Architectures
+
+x86_64 and aarch64 guests are supported.
+
+- On a native aarch64 host with KVM, `accel = "auto"` uses KVM and `-cpu host`.
+- On an x86_64 host, an aarch64 guest uses TCG and `-cpu max`; this is slower.
+- `accel = "kvm"` on a cross-architecture guest is rejected.
+- aarch64 cloud images need UEFI firmware. The tool searches common edk2 paths
+  and `vm.firmware` can override the result.
+- UEFI firmware is not used for direct kernel boot (`kernel.enabled = true`).
+- openEuler's `.qcow2.xz` images are decompressed automatically.
 
 ## SSH and GDB
 

@@ -4,6 +4,23 @@ All notable changes to `simp-vmgen` are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- aarch64 guest support with architecture profiles, UEFI firmware, `ttyAMA0`
+  serial console and native KVM / cross-architecture TCG selection.
+- openEuler 24.03 LTS aarch64 cloud image support, including automatic `.qcow2.xz`
+  decompression and cloud-init templates for dnf/systemd.
+- `vm.firmware` for explicit UEFI firmware selection.
+- Diagnostics for aarch64 firmware, TCG cross-architecture warning, xz and
+  cross compilers.
+
+### Changed
+
+- `DistroRelease` supports per-architecture machine overrides.
+- x86_64 QEMU argv and golden fixtures remain unchanged.
+
 ## [0.3.1] - 2026-11-10
 
 ### Fixed

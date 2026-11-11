@@ -21,7 +21,7 @@ you pass `--force`.
 
 ## Environment
 
-- Distro: **openeuler 24.03-LTS** (aarch64)
+- Distro: **openeuler 24.03-LTS** (aarch64, console `ttyAMA0`)
 - Login user: **root**
 - Resources: 2G RAM, 2 vCPU, 40G disk
 - Accelerator: `auto`

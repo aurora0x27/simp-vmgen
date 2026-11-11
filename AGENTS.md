@@ -17,6 +17,8 @@ upgrading the tool.
 Supported:
 
 - Ubuntu 24.04 and Alpine 3.22 cloud images
+- openEuler 24.03 LTS aarch64 cloud images
+- x86_64 and aarch64 guests with UEFI on aarch64
 - cloud-init provisioning, SSH, serial console, 9p volumes
 - multiple experimental NICs on rootless QEMU socket LANs or Linux bridges
 - compose projects for building and running multiple VMs together
@@ -56,6 +58,8 @@ uv tool install .
 ```text
 src/simp_vmgen/
 ├── cli.py            argparse CLI and dispatch
+├── arch.py           architecture profiles, console, UEFI firmware lookup
+├── cache.py          global cache, resumable downloads, checksums
 ├── config.py         vmgen.toml dataclasses, validation, serialization
 ├── project.py        new / regen / show
 ├── wizard.py         interactive `new -i`
@@ -63,11 +67,11 @@ src/simp_vmgen/
 ├── render.py         generated Makefile/README/.gitignore
 ├── manifest.py       generated-file hashes for regen conflicts
 ├── lock.py           vmgen.lock (image + kernel pins)
-├── cache.py          global cache, resumable downloads, checksums
 ├── distros/          distro metadata and cloud-init templates
 │   ├── base.py       distro loader/validator
 │   ├── ubuntu/
-│   └── alpine/
+│   ├── alpine/
+│   └── openeuler/
 ├── seed.py           cloud-init rendering and NoCloud ISO creation
 ├── users.py          user/SSH-key provisioning data
 ├── mounts.py         resolved 9p mounts
@@ -325,7 +329,8 @@ Keep golden fixture configs stable; otherwise diffs become noisy.
 
 The original single-VM plan and compose M0–M5 are implemented. Compose includes
 socket and bridge networking, lifecycle commands, privileged bridge management
-and the `examples/network-lab` topology. The latest release is 0.3.1. There is
+and the `examples/network-lab` topology. AArch64/openEuler support is being
+added for 0.4.0. The latest release is 0.3.1. There is
 no tracked TODO file; agent scratch context lives in `.agent/` (gitignored).
 Treat this document, the README,
 `docs/configuration.md`, `docs/compose.md`, and the tests as the maintained

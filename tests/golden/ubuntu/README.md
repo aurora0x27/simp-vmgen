@@ -21,7 +21,7 @@ you pass `--force`.
 
 ## Environment
 
-- Distro: **ubuntu 24.04** (x86_64)
+- Distro: **ubuntu 24.04** (x86_64, console `ttyS0`)
 - Login user: **alice**
 - Resources: 4G RAM, 4 vCPU, 30G disk
 - Accelerator: `auto`

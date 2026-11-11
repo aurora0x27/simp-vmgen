@@ -55,8 +55,8 @@ simp-vmgen -C lab-ebpf tty
 simp-vmgen diagnose
 ```
 
-Distro support: Ubuntu 24.04 and Alpine 3.22. Kernel rootfs support uses a
-static busybox initramfs by default.
+Distro support: Ubuntu 24.04, Alpine 3.22 and openEuler 24.03 LTS
+(aarch64). Kernel rootfs support uses a static busybox initramfs by default.
 
 ### CLI reference
 
@@ -78,6 +78,23 @@ static busybox initramfs by default.
 | `compose ...` | Validate, build, run, inspect and clean up a multi-VM topology |
 | `gdb` | Connect to the QEMU gdb stub |
 | `completion bash\|zsh\|fish` | Print a shell completion script |
+
+### Architectures
+
+`--arch` selects the target architecture. x86_64 and aarch64 are supported.
+
+```sh
+simp-vmgen new oe-lab --distro openeuler --arch aarch64 \
+    --mem 2G --cpus 2 --disk 40G
+simp-vmgen -C oe-lab build
+simp-vmgen -C oe-lab up
+```
+
+On an aarch64 host with KVM, QEMU uses `-cpu host`. On an x86_64 host, QEMU
+runs aarch64 with TCG (`-cpu max`), which is slower but usable. aarch64 cloud
+images require UEFI firmware; install `edk2-aarch64` or set `vm.firmware` to a
+`QEMU_EFI.fd` path. openEuler images are distributed as `.qcow2.xz` and are
+decompressed automatically into the cache.
 
 ### Project layout
 

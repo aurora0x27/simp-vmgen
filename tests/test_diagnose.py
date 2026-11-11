@@ -75,6 +75,21 @@ def test_build_report_flags_unknown_distro(tmp_path: Path) -> None:
     assert any(check.name == "distro" and check.status == "missing" for check in report.checks)
 
 
+def test_build_report_checks_aarch64_firmware(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "lab"
+    config = Config.default("lab")
+    config.distro.name = "openeuler"
+    config.distro.arch = "aarch64"
+    config.save(root / "vmgen.toml")
+    monkeypatch.setattr(diag, "firmware_path", lambda *args: Path("/firmware/QEMU_EFI.fd"))
+    monkeypatch.setattr(diag, "_host_arch", lambda: "x86_64")
+    report = diag.build_report(directory=str(root))
+    assert any(check.name == "aarch64 firmware" and check.status == "ok" for check in report.checks)
+    assert any(check.name == "acceleration" and check.status == "warn" for check in report.checks)
+
+
 def test_build_report_flags_missing_mount_source(tmp_path: Path) -> None:
     root = tmp_path / "lab"
     Config.default("lab").save(root / "vmgen.toml")

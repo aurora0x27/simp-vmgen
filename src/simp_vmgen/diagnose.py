@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .arch import firmware_path
 from .cache import cache_dir
 from .config import Config
 from .distros import load_distro
@@ -316,6 +317,7 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
     if config is not None:
         try:
             distro = load_distro(config.distro.name)
+            distro.validate_arch(config.distro.arch)
             release = distro.release(config.distro.release)
             image_compression = release.image_compression
         except SimpVmgenError as exc:
@@ -345,6 +347,29 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
         checks.append(_check_tool("xz"))
     checks.append(_check_tool(f"qemu-system-{arch}", version_args=("--version",)))
     checks.append(_check_tool("qemu-img", version_args=("--version",)))
+    if config is not None and arch == "aarch64" and not config.kernel.enabled:
+        root = _root or Path.cwd()
+        try:
+            firmware = firmware_path(config.vm.firmware, arch, root)
+        except SimpVmgenError as exc:
+            checks.append(CheckResult("aarch64 firmware", "missing", detail=str(exc)))
+        else:
+            checks.append(
+                CheckResult(
+                    "aarch64 firmware",
+                    "ok",
+                    detail=str(firmware),
+                )
+            )
+    if config is not None and arch != _host_arch():
+        checks.append(
+            CheckResult(
+                "acceleration",
+                "warn",
+                detail=f"{arch} will run with TCG on this {_host_arch()} host",
+                required=False,
+            )
+        )
     checks.append(_check_tool("tar"))
     checks.append(_check_tool("gzip"))
 
@@ -387,6 +412,13 @@ def build_report(profile: str | None = None, directory: str | None = None) -> Di
                     checks.append(_check_tool("openssl"))
         else:
             checks.extend(_check_kernel_headers())
+            if config is not None and config.distro.arch == "aarch64" and _host_arch() != "aarch64":
+                checks.append(
+                    _check_tool(
+                        "aarch64-linux-gnu-gcc",
+                        required=False,
+                    )
+                )
             for tool in (
                 "make",
                 "gcc",

@@ -10,6 +10,7 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
 from . import __version__
+from .arch import arch_profile
 from .config import Config, MountConfig
 from .errors import ProjectError
 
@@ -50,6 +51,7 @@ def render_project(config: Config) -> list[RenderedFile]:
     context = {
         "config": config,
         "tool_version": __version__,
+        "console": arch_profile(config.distro.arch).console,
         "work_target": _work_target(config),
         "mounts": _mount_pairs(config),
     }

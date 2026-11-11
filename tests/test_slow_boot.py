@@ -124,6 +124,68 @@ def test_mixed_cloud_network(tmp_path: Path) -> None:
             _stop(root)
 
 
+def test_openeuler_aarch64_boot(tmp_path: Path) -> None:
+    if shutil.which("qemu-system-aarch64") is None:
+        pytest.skip("qemu-system-aarch64 is not installed")
+    if not any(
+        Path(path).is_file()
+        for path in (
+            "/usr/share/edk2/aarch64/QEMU_EFI.fd",
+            "/usr/share/qemu-efi-aarch64/QEMU_EFI.fd",
+            "/usr/share/AAVMF/AAVMF_CODE.fd",
+        )
+    ):
+        pytest.skip("aarch64 UEFI firmware is not installed")
+    if not any(shutil.which(tool) for tool in ("xorriso", "cloud-localds", "genisoimage")):
+        pytest.skip("no cloud-init seed tool")
+    if shutil.which("xz") is None:
+        pytest.skip("xz is not installed")
+
+    root = tmp_path / "openeuler"
+    assert (
+        main(
+            [
+                "new",
+                str(root),
+                "--distro",
+                "openeuler",
+                "--arch",
+                "aarch64",
+                "--mem",
+                "2G",
+                "--cpus",
+                "2",
+                "--disk",
+                "40G",
+            ]
+        )
+        == 0
+    )
+    try:
+        assert runtime.build(_args(root, dry_run=False, force=False)) == 0
+        assert runtime.run(_args(root, dry_run=False, foreground=False, snapshot=False)) == 0
+        assert runtime.wait(_args(root, timeout=300)) == 0
+        assert (
+            runtime.guest(_args(root, guest_command=["sh", "-c", 'test "$(uname -m)" = aarch64']))
+            == 0
+        )
+        assert (
+            runtime.guest(
+                _args(
+                    root,
+                    guest_command=[
+                        "sh",
+                        "-c",
+                        "touch /work/oe-test && test -f /work/oe-test",
+                    ],
+                )
+            )
+            == 0
+        )
+    finally:
+        _stop(root)
+
+
 def test_compose_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     if shutil.which("qemu-system-x86_64") is None or shutil.which("qemu-img") is None:
         pytest.skip("QEMU is not installed")

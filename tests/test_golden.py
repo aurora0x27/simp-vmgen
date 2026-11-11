@@ -12,7 +12,7 @@ from simp_vmgen.seed import render_cloud_init
 GOLDEN = Path(__file__).parent / "golden"
 
 
-@pytest.mark.parametrize("distro", ["ubuntu", "alpine"])
+@pytest.mark.parametrize("distro", ["ubuntu", "alpine", "openeuler"])
 def test_project_files_match_golden(distro: str, tmp_path: Path) -> None:
     directory = GOLDEN / distro
     config = Config.load(directory / "vmgen.toml")
@@ -21,7 +21,7 @@ def test_project_files_match_golden(distro: str, tmp_path: Path) -> None:
         assert rendered[name] == (directory / name).read_text(encoding="utf-8"), name
 
 
-@pytest.mark.parametrize("distro", ["ubuntu", "alpine"])
+@pytest.mark.parametrize("distro", ["ubuntu", "alpine", "openeuler"])
 def test_cloud_init_matches_golden(distro: str, tmp_path: Path) -> None:
     directory = GOLDEN / distro
     config = Config.load(directory / "vmgen.toml")

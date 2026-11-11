@@ -85,7 +85,7 @@ write_files:
       /usr/local/sbin/simp-vmgen-ssh || true
       rc-update add sshd default || true
       rc-service sshd restart || true
-      grep -q '^ttyS0' /etc/inittab 2>/dev/null || echo 'ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100' >> /etc/inittab
+      grep -q '^{{ console }}' /etc/inittab 2>/dev/null || echo '{{ console }}::respawn:/sbin/getty -L {{ console }} 115200 vt100' >> /etc/inittab
       kill -HUP 1 || true
       /usr/local/sbin/simp-vmgen-mounts || true
       rc-update add simp-vmgen-ready default || true

@@ -1,0 +1,52 @@
+schema = 1
+
+[project]
+name = "golden-openeuler"
+
+[distro]
+name = "openeuler"
+release = "24.03-LTS"
+arch = "aarch64"
+image = "https://dl-cdn.openeuler.openatom.cn/openEuler-24.03-LTS/virtual_machine_img/aarch64/openEuler-24.03-LTS-aarch64.qcow2.xz"
+
+[vm]
+mem = "2G"
+cpus = 2
+disk = "40G"
+accel = "auto"
+display = "none"
+machine = "virt"
+
+[ssh]
+enabled = true
+host = "127.0.0.1"
+port = "auto"
+user = "root"
+permit_root_login = true
+wait_timeout = 900
+key = ".simp-vmgen/ssh/id_ed25519"
+
+[gdb]
+enabled = false
+port = "auto"
+wait = false
+
+[[mount]]
+source = "work"
+target = "/work"
+
+[[users]]
+name = "root"
+password = "114514"
+
+[provision]
+timezone = "Asia/Shanghai"
+package_sets = [
+    "base",
+]
+
+[kernel]
+enabled = false
+mode = "build"
+config = "defconfig"
+rootfs = "busybox"

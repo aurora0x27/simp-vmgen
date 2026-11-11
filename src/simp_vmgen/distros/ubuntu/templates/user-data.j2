@@ -91,7 +91,7 @@ runcmd:
   - bash -c 'id ubuntu >/dev/null 2>&1 && userdel -r ubuntu || true'
   - systemctl enable --now ssh || true
   - systemctl restart ssh || true
-  - systemctl enable --now serial-getty@ttyS0.service || true
+  - systemctl enable --now serial-getty@{{ console }}.service || true
   - /usr/local/sbin/simp-vmgen-mounts || true
   - systemctl enable --now simp-vmgen-ready.service || true
   - systemctl restart simp-vmgen-ready.service || true

@@ -1,0 +1,52 @@
+name = "openeuler"
+display_name = "openEuler"
+architectures = ["aarch64"]
+default_release = "24.03-LTS"
+provisioner = "cloud-init"
+init_system = "systemd"
+package_manager = "dnf"
+default_shell = "bash"
+ssh_service = "sshd"
+templates = "templates"
+
+[image_arches]
+aarch64 = "aarch64"
+
+[shell_paths]
+bash = "/bin/bash"
+sh = "/bin/sh"
+
+[package_sets]
+base = []
+dev = [
+    "gcc",
+    "git",
+    "make",
+    "python3",
+    "tar",
+]
+kernel = [
+    "bc",
+    "bison",
+    "flex",
+    "gcc",
+    "git",
+    "make",
+    "openssl-devel",
+    "perl",
+    "python3",
+    "rsync",
+    "tar",
+    "xz",
+]
+
+[[release]]
+version = "24.03-LTS"
+image_url = "https://dl-cdn.openeuler.openatom.cn/openEuler-{version}/virtual_machine_img/{arch}/openEuler-{version}-{arch}.qcow2.xz"
+image_checksum_url = "https://dl-cdn.openeuler.openatom.cn/openEuler-{version}/virtual_machine_img/{arch}/openEuler-{version}-{arch}.qcow2.xz.sha256sum"
+image_format = "qcow2"
+image_compression = "xz"
+default_mem = "2G"
+default_cpus = 2
+default_disk = "40G"
+machines = { aarch64 = "virt" }

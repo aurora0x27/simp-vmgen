@@ -14,7 +14,7 @@ from simp_vmgen.errors import DistroError
 
 
 def test_available_distros() -> None:
-    assert available_distros() == ["alpine", "ubuntu"]
+    assert available_distros() == ["alpine", "openeuler", "ubuntu"]
 
 
 def test_ubuntu_metadata() -> None:
@@ -48,6 +48,17 @@ def test_arch_validation_and_machine_fallback() -> None:
     assert release.machine_for("x86_64") == "q35"
     with pytest.raises(DistroError, match="does not support architecture"):
         distro.validate_arch("riscv64")
+
+
+def test_openeuler_metadata() -> None:
+    distro = load_distro("openeuler")
+    release = distro.release()
+    assert distro.architectures == ("aarch64",)
+    assert distro.init_system == "systemd"
+    assert distro.package_manager == "dnf"
+    assert release.image_compression == "xz"
+    assert release.machine_for("aarch64") == "virt"
+    assert release.image_url_for("aarch64").endswith("openEuler-24.03-LTS-aarch64.qcow2.xz")
 
 
 def test_packages_are_merged_and_deduplicated() -> None:

@@ -14,6 +14,7 @@ from pathlib import Path
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
 from . import __version__
+from .arch import arch_profile
 from .config import Config
 from .distros import Distro
 from .errors import ProjectError
@@ -94,6 +95,7 @@ def _render_context(
         "root_login": config.ssh.permit_root_login,
         "ssh_pwauth": any(user.password for user in users),
         "ready_marker": f"{READY_MARKER} name={hostname}",
+        "console": arch_profile(config.distro.arch).console,
         "generated_public_key": generated_public_key,
     }
     return context
